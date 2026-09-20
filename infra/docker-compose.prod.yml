@@ -51,6 +51,11 @@ services:
   postgres:
     image: postgres:16-alpine
     <<: *restart
+    # The default max_connections=100 is not enough: Medusa keeps a pool per
+    # module in EACH of migrate / server / worker. Pools are capped in
+    # medusa-config.ts (DB_POOL_MAX, default 3) — ~26 modules x 3 x 3 processes
+    # still needs well over 100. Raise both together if you change either.
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-naran}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/.env}
@@ -62,8 +67,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-    # Memory caps tuned for a ~4–6GB VPS; raise if you scale up (H7).
-    mem_limit: 768m
+    # Raised from 768m with max_connections: each backend needs its own memory.
+    mem_limit: 1536m
     networks: [naran]
 
   redis:
@@ -104,7 +109,9 @@ services:
     environment:
       <<: *medusa-env
     command: ["sh", "-c", "cd .medusa/server && npx medusa db:migrate"]
-    mem_limit: 768m
+    # Loads every module at once to migrate them; 768m left it thrashing for
+    # ~25 min before timing out. Freed again as soon as the one-shot exits.
+    mem_limit: 1536m
     networks: [naran]
 
   # HTTP server (admin + store/API). Migrations already ran in medusa-migrate, so
