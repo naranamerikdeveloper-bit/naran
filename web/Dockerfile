@@ -35,7 +35,11 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
+# HOSTNAME must be pinned: the standalone server binds to `process.env.HOSTNAME`,
+# and Docker sets that to the container id, so Next listens ONLY on the container
+# IP. The healthcheck (and anything else on 127.0.0.1) then gets connection
+# refused, the container is marked unhealthy, and Traefik drops its routers.
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 # Standalone server + the assets it does not bundle (static + public).
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
