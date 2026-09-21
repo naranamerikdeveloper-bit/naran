@@ -58,19 +58,27 @@ export function Tabs({ product }: { product: Product }) {
         )}
 
         {tab === "reviews" && (
-          <div className="grid sm:grid-cols-2 gap-4 max-w-[760px]">
-            {[
-              { n: "Camille D.", q: t("pdp.rev1Q") },
-              { n: "Theo M.", q: t("pdp.rev2Q") },
-            ].map((r, i) => (
-              <div key={r.n}
-                className="rounded-2xl border border-line bg-white p-5 sm:p-6 shadow-soft rise-in"
-                style={{ animationDelay: `${40 + i * 70}ms` }}>
-                <div className="text-[#F4B400]" aria-hidden>★★★★★</div>
-                <p className="my-3 text-[15px] leading-relaxed">&ldquo;{r.q}&rdquo;</p>
-                <div className="tiny">{r.n} · {t("pdp.verified")}</div>
+          // No review system yet, so no invented quotes: an honest empty state
+          // plus the store's real guarantees.
+          <div className="max-w-[760px] rounded-2xl border border-line bg-gradient-to-br from-[#FFF7F5] via-white to-white p-6 sm:p-8">
+            <div className="flex items-start gap-4">
+              <span className="grid place-items-center w-12 h-12 rounded-full bg-accent-soft text-accent-deep shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <div>
+                <div className="font-display text-[20px] sm:text-[22px] leading-tight">{t("pdp.revEmptyT")}</div>
+                <p className="text-muted text-[14.5px] leading-relaxed mt-1.5">{t("pdp.revEmptyD")}</p>
               </div>
-            ))}
+            </div>
+            <ul className="mt-6 grid sm:grid-cols-3 gap-2.5">
+              {["pdp.revTrust1", "pdp.revTrust2", "pdp.revTrust3"].map((k, i) => (
+                <li key={k} className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-4 py-3 text-[13.5px] font-medium rise-in"
+                  style={{ animationDelay: `${40 + i * 60}ms` }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-accent shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+                  {t(k)}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
