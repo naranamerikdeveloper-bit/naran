@@ -1,4 +1,5 @@
 "use client";
+import { Logo } from "@/components/Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -124,7 +125,7 @@ export default function AuthPage() {
             <Link href="/" aria-label={t("bc.home")} className="grid h-9 w-9 -ml-1 place-items-center rounded-full text-ink/70 hover:bg-surface-2 transition">
               <ChevronLeft width={20} height={20} />
             </Link>
-            <span className="font-display text-[22px] tracking-[.04em]">NARAN</span>
+            <Logo className="h-10 mx-auto"/>
             <button type="button" onClick={toggle} className="text-[13px] font-medium text-accent hover:underline">
               {isReg ? t("auth.signIn") : t("auth.signUp")}
             </button>

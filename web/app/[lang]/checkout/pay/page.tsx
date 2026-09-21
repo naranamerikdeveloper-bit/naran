@@ -1,4 +1,5 @@
 "use client";
+import { Logo } from "@/components/Logo";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -201,7 +202,7 @@ function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }
         transition={{ duration: 0.5, ease: EASE }}
         className={`bg-white rounded-3xl p-8 sm:p-10 w-full border border-line shadow-lift text-center ${wide ? "max-w-[520px]" : "max-w-[460px]"}`}
       >
-        <span className="font-display text-[22px] tracking-[.04em]">NARAN</span>
+        <Logo className="h-10 mx-auto"/>
         {children}
       </motion.div>
     </div>

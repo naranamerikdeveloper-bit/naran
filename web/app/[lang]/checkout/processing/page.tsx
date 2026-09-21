@@ -1,4 +1,5 @@
 "use client";
+import { Logo } from "@/components/Logo";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -72,7 +73,7 @@ function Processing() {
         transition={{ duration: 0.5, ease: EASE }}
         className="bg-white rounded-3xl p-10 max-w-[460px] w-full border border-line shadow-lift text-center"
       >
-        <span className="font-display text-[22px] tracking-[.04em]">NARAN</span>
+        <Logo className="h-10 mx-auto"/>
         <AnimatePresence mode="wait" initial={false}>
           {state === "review" ? (
             <motion.div key="review" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35, ease: EASE }}>

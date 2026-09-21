@@ -1,4 +1,5 @@
 "use client";
+import { Logo } from "./Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -91,6 +92,7 @@ export function Nav() {
     <>
       {/* ---------- Mobile bar ---------- */}
       <div className="lg:hidden flex items-center gap-2.5">
+        <Link href="/" aria-label="NARAN" className="shrink-0 -ml-0.5"><Logo priority className="h-10"/></Link>
         <form onSubmit={search} className="flex-1 min-w-0 h-11 bg-white/70 border border-white/60 shadow-soft rounded-pill flex items-center gap-2.5 px-4 backdrop-blur focus-within:bg-white transition">
           <button type="submit" className="text-subtle hover:text-ink shrink-0 active:scale-90 transition" aria-label={t("nav.search")}><SearchIcon width={16} height={16}/></button>
           <input value={q} onChange={e => setQ(e.target.value)} aria-label={t("nav.search")} data-search-input
@@ -116,9 +118,8 @@ export function Nav() {
           ))}
         </div>
 
-        <Link href="/" className="group justify-self-center flex items-center gap-2 font-display text-[20px] xl:text-[22px] tracking-[.04em] leading-none whitespace-nowrap">
-          <span className="w-2 h-2 rounded-full bg-accent transition-transform duration-300 ease-spring group-hover:scale-125"/>
-          NARAN
+        <Link href="/" aria-label="NARAN" className="justify-self-center flex items-center transition-transform duration-300 ease-spring hover:scale-[1.04]">
+          <Logo priority className="h-12 xl:h-[52px] -my-2"/>
         </Link>
 
         <div className="flex items-center gap-2 xl:gap-2.5 justify-self-end">

@@ -1,14 +1,9 @@
 "use client";
+import { Logo } from "./Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { useT } from "./LangProvider";
 
 // Inline icons (no extra deps).
-const SunMark = (p: any) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}>
-    <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </svg>
-);
 const IgIcon = (p: any) => (
   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
     <rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
@@ -41,12 +36,7 @@ export function Footer() {
         <div className="flex flex-col gap-10 md:flex-row md:justify-between md:gap-12">
           {/* Brand */}
           <div className="flex flex-col items-center text-center md:items-start md:max-w-xs md:text-left">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-accent to-accent-deep text-white shadow-[0_8px_20px_-6px_rgba(231,111,97,.5)]">
-                <SunMark />
-              </span>
-              <span className="font-display text-2xl font-black tracking-tight">NARAN</span>
-            </div>
+            <Logo variant="full" className="h-24"/>
             <p className="mt-5 text-sm leading-relaxed text-muted">{t("foot.tagline")}</p>
 
             <div className="mt-5 flex flex-col items-center gap-2 md:items-start">

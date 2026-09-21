@@ -1,4 +1,5 @@
 "use client";
+import { Logo } from "@/components/Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { Suspense, useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -67,8 +68,8 @@ function Success() {
       >
         <Confetti />
 
-        <Link href="/" className="relative z-10 flex items-center justify-center font-display text-[22px] tracking-[.04em]">
-          NARAN
+        <Link href="/" className="relative z-10 flex items-center justify-center">
+          <Logo className="h-11"/>
         </Link>
 
         {/* success mark: ring pulse + spring circle + drawn check */}
