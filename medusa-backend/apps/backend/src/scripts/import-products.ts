@@ -11,10 +11,16 @@ import * as fs from "fs";
  *   PURGE_PREFIX=bulk-              npx medusa exec ./src/scripts/import-products.ts   # delete imported test data
  *
  * CSV columns (header row required):
- *   handle,title,price,category,sizes,image,description
+ *   handle,title,price,category,sizes,image,description[,brand]
  *   - price: integer MNT (₮)
  *   - sizes: pipe-separated (e.g. "50ml|100ml"); blank → "Нэг хэмжээ"
  *   - image: URL or /products/x.avif; blank allowed
+ *   - brand: optional; stored as the product subtitle + metadata.brand
+ *
+ * Per-size prices: give several rows the SAME handle — they become ONE product
+ * whose variants are the rows, each with its own price (a perfume's 50ml and
+ * 150ml cost different amounts). In that case `sizes` is the single variant
+ * label of the row. Title/category/image/description come from the first row.
  */
 
 const BATCH = 100; // products created per workflow call
@@ -110,33 +116,56 @@ export default async function importProducts({ container }: ExecArgs) {
     page.forEach(p => p.handle && existing.add(p.handle));
     if (page.length < 1000) break;
   }
-  const toImport = rows.filter(r => !existing.has(r.handle));
-  logger.info(`${toImport.length} new products to import (${rows.length - toImport.length} already present).`);
+  // Rows sharing a handle are one product (one variant per row, own price).
+  const groups = new Map<string, Record<string, string>[]>();
+  for (const r of rows) {
+    const g = groups.get(r.handle);
+    if (g) g.push(r); else groups.set(r.handle, [r]);
+  }
+  const toImport = [...groups.values()].filter(g => !existing.has(g[0].handle));
+  logger.info(`${toImport.length} new products to import (${groups.size - toImport.length} already present).`);
+
+  const toPrice = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const variantsFor = (g: Record<string, string>[]): { title: string; price: number }[] => {
+    if (g.length === 1) {
+      // Legacy single-row form: every size in `sizes` shares the row price.
+      const sizes = (g[0].sizes ? g[0].sizes.split("|").map(s => s.trim()).filter(Boolean) : []);
+      return (sizes.length ? sizes : ["Нэг хэмжээ"]).map(title => ({ title, price: toPrice(g[0].price) }));
+    }
+    const seen = new Map<string, number>();
+    return g.map(r => {
+      const base = (r.sizes || "").trim() || "Нэг хэмжээ";
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      return { title: n > 1 ? `${base} (${n})` : base, price: toPrice(r.price) };
+    });
+  };
 
   const t0 = Date.now();
   let created = 0;
   for (let i = 0; i < toImport.length; i += BATCH) {
     const chunk = toImport.slice(i, i + BATCH);
-    const products = chunk.map(r => {
-      const price = Math.max(0, Math.round(Number(r.price) || 0));
-      const sizes = (r.sizes ? r.sizes.split("|").map(s => s.trim()).filter(Boolean) : []);
-      const values = sizes.length ? sizes : ["Нэг хэмжээ"];
+    const products = chunk.map(g => {
+      const r = g[0];
+      const variants = variantsFor(g);
       const img = r.image || undefined;
+      const brand = (r.brand || "").trim();
       return {
         title: r.title,
         handle: r.handle,
+        ...(brand ? { subtitle: brand, metadata: { brand } } : {}),
         description: r.description || "",
         status: "published" as const,
         category_ids: categoryIdsFor(r.category),
         ...(img ? { thumbnail: img, images: [{ url: img }] } : {}),
         shipping_profile_id: profile.id,
-        options: [{ title: "Хэмжээ", values }],
-        variants: values.map(s => ({
-          title: s,
-          sku: `${r.handle}-${s}`.toLowerCase().replace(/\s+/g, "-"),
+        options: [{ title: "Хэмжээ", values: variants.map(v => v.title) }],
+        variants: variants.map(v => ({
+          title: v.title,
+          sku: `${r.handle}-${v.title}`.toLowerCase().replace(/[^a-z0-9а-яөүё.]+/gi, "-").replace(/^-|-$/g, ""),
           manage_inventory: false,
-          options: { "Хэмжээ": s },
-          prices: [{ amount: price, currency_code: "mnt" }],
+          options: { "Хэмжээ": v.title },
+          prices: [{ amount: v.price, currency_code: "mnt" }],
         })),
         sales_channels: [{ id: channel.id }],
       };

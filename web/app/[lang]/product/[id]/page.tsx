@@ -126,6 +126,9 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
               </div>
 
               <div className="flex items-baseline gap-3 mt-5">
+                {new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1 && (
+                  <span className="text-[13px] text-muted">{t("common.from")}</span>
+                )}
                 <span className="font-display text-[30px] text-accent-deep">{money(product.price)}</span>
                 {product.was && <span className="text-subtle line-through num-tabular">{money(product.was)}</span>}
                 {product.was && (

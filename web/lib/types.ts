@@ -27,7 +27,9 @@ export type Product = {
   accent: string;
   image?: string;
   images?: string[];
-  variants?: { id: string; size: string; stock: number }[];
+  // `price` is the variant's own price (sizes of one perfume differ: 50ml vs
+  // 150ml). Product.price is the lowest of them — a "from" price.
+  variants?: { id: string; size: string; stock: number; price?: number }[];
 };
 
 export type CartItem = {

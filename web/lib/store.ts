@@ -26,7 +26,11 @@ export const useCart = create<CartState>()(
         if (existing) {
           return { items: s.items.map(i => (i.variantId || i.id) === key ? { ...i, qty: i.qty + qty } : i) };
         }
-        return { items: [...s.items, { id: p.id, name: p.name, price: p.price, qty, accent: p.accent, category: p.category, shape: p.shape, image: p.image, size, variantId }] };
+        // Charge the chosen variant's own price (sizes differ), not the product's
+        // lowest "from" price. The server re-prices the cart anyway; this keeps
+        // the drawer/checkout subtotal equal to what the QR will ask for.
+        const price = p.variants?.find(v => v.id === variantId)?.price ?? p.price;
+        return { items: [...s.items, { id: p.id, name: p.name, price, qty, accent: p.accent, category: p.category, shape: p.shape, image: p.image, size, variantId }] };
       }),
       remove: key => set(s => ({ items: s.items.filter(i => (i.variantId || i.id) !== key) })),
       setQty: (key, qty) => set(s => ({

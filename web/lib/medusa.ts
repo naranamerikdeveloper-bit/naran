@@ -128,7 +128,10 @@ function map(m: any): Product {
     const levels = (v?.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
     return levels.reduce((a: number, l: any) => a + (l?.available_quantity ?? 0), 0);
   };
-  const variants = (m.variants || []).map((v: any) => ({ id: v.id, size: v.title, stock: variantStock(v) }));
+  const variants = (m.variants || []).map((v: any) => {
+    const amt = v?.calculated_price?.calculated_amount;
+    return { id: v.id, size: v.title, stock: variantStock(v), price: typeof amt === "number" ? Math.round(amt) : undefined };
+  });
   const stock = variants.reduce((a: number, v: any) => a + v.stock, 0);
   // Real gallery images: thumbnail first, then any product images (de-duped).
   const images: string[] = Array.from(new Set(

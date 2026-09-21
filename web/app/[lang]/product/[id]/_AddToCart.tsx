@@ -19,6 +19,11 @@ export function AddToCart({ product }: { product: Product }) {
   const [size, setSize] = useState(sizable ? "" : product.sizes[0]);
 
   const sizeStock = (s: string) => product.variants?.find(v => v.size === s)?.stock ?? 9999;
+  // Sizes can have different prices (50ml vs 150ml): show each on its pill and
+  // use the selected one in the sticky bar.
+  const priceOf = (s: string) => product.variants?.find(v => v.size === s)?.price ?? product.price;
+  const hasRange = new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1;
+  const shownPrice = size ? priceOf(size) : product.price;
   const soldOut = (product.variants?.length ?? 0) > 0 && product.variants!.every(v => v.stock === 0);
 
   function handleAdd(src?: HTMLElement | null, then?: () => void) {
@@ -44,7 +49,10 @@ export function AddToCart({ product }: { product: Product }) {
                   className={`min-w-[52px] px-4 py-2.5 rounded-pill border text-sm transition ${
                     out ? "border-border bg-surface-2 text-subtle line-through cursor-not-allowed"
                     : size === s ? "bg-ink text-white border-ink" : "border-border bg-white hover:border-ink"
-                  }`}>{s}</button>
+                  }`}>
+                  {s}
+                  {hasRange && <span className="ml-1.5 opacity-70 num-tabular">{money(priceOf(s))}</span>}
+                </button>
               );
             })}
           </div>
@@ -89,7 +97,8 @@ export function AddToCart({ product }: { product: Product }) {
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
       >
         <div className="min-w-0">
-          <div className="font-display text-[18px] num-tabular leading-none">{money(product.price)}</div>
+          {hasRange && !size && <div className="tiny leading-none mb-1">{t("common.from")}</div>}
+          <div className="font-display text-[18px] num-tabular leading-none">{money(shownPrice)}</div>
           {sizable && !size && <div className="tiny mt-0.5">{t("common.size")}</div>}
         </div>
         <button

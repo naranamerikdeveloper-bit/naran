@@ -104,6 +104,9 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             <p className="tiny truncate mt-0.5">{t(`cat.${product.category}`)}</p>
           </div>
           <div className="text-right shrink-0">
+            {new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1 && (
+              <span className="tiny block leading-tight">{t("common.from")}</span>
+            )}
             <span className="font-display text-[15px] sm:text-[16px] num-tabular block leading-tight">{money(product.price)}</span>
             {product.was && <span className="tiny line-through num-tabular">{money(product.was)}</span>}
           </div>
