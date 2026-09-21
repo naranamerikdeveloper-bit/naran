@@ -30,10 +30,10 @@ const ProductListHidden = () => {
         </Text>
         <Text size="small" className="text-ui-tag-orange-text mt-1">
           {mn
-            ? "Тэдгээр нь Draft төлөвтэй. Бараа руу орж Media хэсэгт зураг нэмэхэд автоматаар нийтлэгдэнэ."
+            ? "Тэдгээр нь Draft төлөвтэй. Зураг нэмэхэд автоматаар нийтлэгдэнэ — нэг нэгээр эсвэл олноор нь."
             : "They are kept as Draft. Open a product and add an image in Media — it is published automatically."}{" "}
-          <a href="/app/products?status=draft" className="underline font-medium">
-            {mn ? "Жагсаалтыг харах →" : "Show them →"}
+          <a href="/app/images" className="underline font-medium">
+            {mn ? "Зураг оруулах →" : "Add images →"}
           </a>
         </Text>
         <Text size="xsmall" className="text-ui-tag-orange-text mt-2 truncate opacity-80">

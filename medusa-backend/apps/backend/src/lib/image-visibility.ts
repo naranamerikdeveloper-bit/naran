@@ -23,8 +23,9 @@ export function visibilityPatch(p: P): { status: "draft" | "published"; metadata
     return { status: "draft", metadata: { ...meta, hidden_reason: HIDDEN_NO_IMAGE } };
   }
   if (hasImage(p) && hiddenByUs) {
-    delete meta.hidden_reason;
-    return { status: p.status === "draft" ? "published" : (p.status as any), metadata: meta };
+    // Medusa MERGES metadata on update, so omitting the key would keep it;
+    // an empty string is how a metadata key is deleted.
+    return { status: p.status === "draft" ? "published" : (p.status as any), metadata: { ...meta, hidden_reason: "" } };
   }
   return null;
 }

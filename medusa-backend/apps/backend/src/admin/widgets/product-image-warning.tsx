@@ -11,7 +11,7 @@ const ProductImageWarning = ({ data }: DetailWidgetProps<AdminProduct>) => {
   const { i18n } = useTranslation();
   const mn = !i18n.language || i18n.language.startsWith("mn");
   const noImage = !data?.thumbnail && !(data?.images || []).some(i => i?.url);
-  const hiddenByRule = (data?.metadata as any)?.hidden_reason === "no_image";
+  const hiddenByRule = (data?.metadata as any)?.hidden_reason === "no_image" && data?.status === "draft";
   if (!noImage && !hiddenByRule) return null;
 
   return (
