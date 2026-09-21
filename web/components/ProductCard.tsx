@@ -15,11 +15,11 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
   const add = useCart(s => s.add);
   const openQuickView = useQuickView(s => s.open);
   const toggleWish = useWish(s => s.toggle);
-  const has = useWish(s => s.has);
+  const inWish = useWish(s => s.ids.includes(product.id));
   const showToast = useToast(s => s.show);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const wished = mounted && has(product.id);
+  const wished = mounted && inWish;
   const soldOut = product.stock === 0;
   const t = useT();
 
@@ -63,7 +63,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           <button
             onClick={(e) => { e.preventDefault(); toggleWish(product.id); }}
             className={`absolute top-3 right-3 z-10 w-9 h-9 rounded-full grid place-items-center backdrop-blur transition-all duration-200 ease-elegant active:scale-90 ${
-              wished ? "text-red-500 bg-white scale-105" : "text-ink bg-white/85 hover:bg-white hover:scale-105"
+              wished ? "text-accent bg-white scale-105" : "text-ink bg-white/85 hover:bg-white hover:scale-105"
             }`}
             aria-label={`${t("nav.wishlist")}: ${product.name}`}
             aria-pressed={wished}
