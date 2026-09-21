@@ -33,7 +33,7 @@ export default function NotFound() {
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: EASE }}
           className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/" className="btn btn-primary">{t("nf.home")}</Link>
+          <Link href="/" className="btn btn-outline">{t("nf.home")}</Link>
           <Link href="/shop" className="btn btn-ghost">{t("nf.shop")}</Link>
         </motion.div>
       </motion.div>

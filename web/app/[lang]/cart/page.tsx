@@ -66,7 +66,7 @@ export default function CartPage() {
                 <div className="py-16 px-6 text-center">
                   <h3 className="font-display text-[22px] mb-2">{t("cart.emptyTitle")}</h3>
                   <p className="text-muted">{t("cart.emptyDesc")}</p>
-                  <Link href="/shop" className="btn btn-primary mt-5 inline-flex">
+                  <Link href="/shop" className="btn btn-outline mt-5 inline-flex">
                     {t("common.browseShop")} <span className="arrow-cap !bg-white !text-ink"><ArrowRight width={14} height={14}/></span>
                   </Link>
                 </div>

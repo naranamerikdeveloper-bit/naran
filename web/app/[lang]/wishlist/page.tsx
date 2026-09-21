@@ -60,7 +60,7 @@ export default function WishlistPage() {
               </span>
               <h3 className="font-display text-[22px]">{t("wish.emptyTitle")}</h3>
               <p className="text-muted mt-2 text-sm max-w-[320px] mx-auto">{t("wish.emptyDesc")}</p>
-              <Link href="/shop" className="btn btn-primary mt-6 inline-flex">
+              <Link href="/shop" className="btn btn-outline mt-6 inline-flex">
                 {t("wish.browse")} <span className="arrow-cap !bg-white !text-ink"><ArrowRight width={14} height={14}/></span>
               </Link>
             </div>

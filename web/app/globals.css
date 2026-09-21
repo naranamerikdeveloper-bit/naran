@@ -152,7 +152,8 @@ html.lenis, html.lenis body { height: auto; }
   .btn-dark    { @apply bg-accent-deep text-white hover:bg-[#BF4D40] hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-10px_rgba(211,90,76,.55)]; }
   .btn-ghost   { @apply bg-surface-2 text-ink hover:bg-white hover:shadow-soft hover:-translate-y-0.5; }
   .btn-light   { @apply bg-white text-ink hover:bg-mist hover:-translate-y-0.5 hover:shadow-soft; }
-  .btn-outline { @apply border border-ink/20 text-ink hover:border-ink hover:bg-white bg-white/40; }
+  /* Black-and-white secondary / navigation button; inverts to solid ink on hover. */
+  .btn-outline { @apply border border-ink/25 bg-white text-ink hover:bg-ink hover:border-ink hover:text-white hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-14px_rgba(10,10,11,.45)]; }
   .btn-sm      { @apply h-10 px-4 text-[12px]; }
   .arrow-cap   { @apply w-8 h-8 rounded-full grid place-items-center bg-white text-ink transition-transform duration-300 ease-spring; }
 

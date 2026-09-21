@@ -146,7 +146,7 @@ export default async function ShopPage({
               </span>
               <h3 className="font-display text-[22px]">{t("shop.emptyTitle")}</h3>
               <p className="text-muted mt-2 text-sm max-w-[320px] mx-auto">{t("shop.emptyDesc")}</p>
-              <Link href="/shop" className="btn btn-primary mt-6 inline-flex">{t("shop.reset")} <ArrowRight width={14} height={14}/></Link>
+              <Link href="/shop" className="btn btn-outline mt-6 inline-flex">{t("shop.reset")} <ArrowRight width={14} height={14}/></Link>
             </Reveal>
           ) : (
             <>

@@ -384,7 +384,7 @@ function Empty({ msg, cta }: { msg: string; cta?: boolean }) {
     <div className="py-10 text-center">
       <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink/35"><BagIcon width={22} height={22}/></span>
       <p className="text-muted">{msg}</p>
-      {cta && <Link href="/shop" className="btn btn-primary btn-sm mt-4 inline-flex">{t("acc.startShopping")}</Link>}
+      {cta && <Link href="/shop" className="btn btn-outline btn-sm mt-4 inline-flex">{t("acc.startShopping")}</Link>}
     </div>
   );
 }

@@ -112,7 +112,7 @@ function Success() {
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.68, duration: 0.5, ease: EASE }}
           className="relative z-10 flex justify-center gap-2.5">
-          <Link href="/account" className="btn btn-primary">{t("ok.viewOrders")}</Link>
+          <Link href="/account" className="btn btn-outline">{t("ok.viewOrders")}</Link>
           <Link href="/" className="btn btn-ghost">{t("ok.continue")}</Link>
         </motion.div>
       </motion.div>

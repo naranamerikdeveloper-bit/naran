@@ -197,9 +197,9 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
             {products.slice(4, 12).map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
           </div>
           <div className="flex justify-center mt-10">
-            <Link href="/shop" className="btn btn-dark">
+            <Link href="/shop" className="btn btn-outline">
               {t("home.browseAll")}
-              <span className="arrow-cap !bg-white !text-ink"><ArrowUpRight width={14} height={14}/></span>
+              <ArrowRight width={16} height={16}/>
             </Link>
           </div>
         </div>
