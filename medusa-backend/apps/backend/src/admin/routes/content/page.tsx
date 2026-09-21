@@ -113,8 +113,9 @@ const ContentPage = () => {
     if (!content) return;
     setSaving(true);
     try {
-      await adminFetch("/cms/homepage", { method: "POST", body: JSON.stringify({ content }) });
-      toast.success("Хадгаллаа — нүүр хуудсанд тусгагдана");
+      const { live } = await adminFetch("/cms/homepage", { method: "POST", body: JSON.stringify({ content }) });
+      if (live) toast.success("Хадгаллаа — сайтад шууд гарлаа");
+      else toast.success("Хадгаллаа — сайтад хэдэн минутын дотор тусгагдана");
     } catch (e: any) {
       toast.error(e.message || "Хадгалах амжилтгүй");
     } finally {

@@ -20,8 +20,11 @@ const H = { "content-type": "application/json", "x-publishable-api-key": PK };
 
 // `revalidate` (seconds) makes the fetch cacheable → the calling page can render
 // statically / ISR (fast LCP). Omit → no-store (fresh; carts, auth, orders).
+// Cached fetches are tagged so the backend can purge them on demand
+// (app/api/revalidate): "cms" for homepage content, "catalog" for the rest.
 async function mfetch(path: string, retries = 1, revalidate?: number): Promise<any> {
-  const cacheOpt = typeof revalidate === "number" ? { next: { revalidate } } : { cache: "no-store" as const };
+  const tags = [path.startsWith("cms/") ? "cms" : "catalog"];
+  const cacheOpt = typeof revalidate === "number" ? { next: { revalidate, tags } } : { cache: "no-store" as const };
   try {
     const res = await fetch(`${URL}/store/${path}`, { headers: H, ...cacheOpt });
     if (!res.ok) throw new Error(`Medusa ${res.status}`);

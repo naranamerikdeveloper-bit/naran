@@ -44,6 +44,10 @@ x-medusa-env: &medusa-env
   # Blank RESEND_API_KEY → emails log-only (mock). The worker sends these, so
   # they belong in the shared env (B7).
   STOREFRONT_URL: ${STOREFRONT_URL:-http://localhost:3000}
+  # On-demand storefront revalidation (admin saves go live immediately).
+  # Defaults to a value derived from COOKIE_SECRET so no extra setup is needed.
+  REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${COOKIE_SECRET}}
+  STOREFRONT_REVALIDATE_URL: http://web:3000/api/revalidate
   RESEND_API_KEY: ${RESEND_API_KEY:-}
   EMAIL_FROM: ${EMAIL_FROM:-NARAN <onboarding@resend.dev>}
 
@@ -218,6 +222,8 @@ services:
     environment:
       # Runtime: the storefront proxies /api/* to the Express gateway.
       API_URL: http://api:4000
+      # Shared with Medusa: authorizes /api/revalidate calls from the backend.
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${COOKIE_SECRET}}
       # Needed at RUNTIME by next.config headers() to allowlist the Medusa origin
       # in the CSP connect-src (the browser calls Medusa directly). Without it the
       # enforced CSP would block store API calls in production.
