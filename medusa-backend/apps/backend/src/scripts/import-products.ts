@@ -93,8 +93,15 @@ export default async function importProducts({ container }: ExecArgs) {
     return [id];
   };
 
-  const rows = parseCsv(fs.readFileSync(file, "utf8")).filter(r => r.handle && r.title);
+  // Strip a UTF-8 BOM: Excel's "CSV UTF-8" export adds one, which would turn the
+  // first header into "﻿handle" and make EVERY row fail the filter below.
+  const text = fs.readFileSync(file, "utf8").replace(/^﻿/, "");
+  const parsed = parseCsv(text);
+  const rows = parsed.filter(r => r.handle && r.title);
   logger.info(`Parsed ${rows.length} rows from ${file}.`);
+  if (parsed.length && !rows.length) {
+    throw new Error(`No usable rows: expected a header row with "handle" and "title" columns, got: ${Object.keys(parsed[0]).join(", ")}`);
+  }
 
   // Skip handles that already exist (idempotent re-runs).
   const existing = new Set<string>();
