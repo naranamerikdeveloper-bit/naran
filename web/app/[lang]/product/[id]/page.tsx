@@ -21,8 +21,11 @@ export const dynamicParams = true; // products not prerendered below render on-d
 // catalog, cap this to top-N and let the rest render on-demand (dynamicParams).
 export async function generateStaticParams() {
   try {
+    // The full catalog is 400+ products (×2 locales); prerendering all of them
+    // makes every deploy fetch ~1,700 pages from Medusa. Prebuild the first 60,
+    // the rest render on first visit and are then cached (dynamicParams + ISR).
     const { data } = await api.products.list({});
-    return LOCALES.flatMap(lang => data.map(p => ({ lang, id: p.slug })));
+    return LOCALES.flatMap(lang => data.slice(0, 60).map(p => ({ lang, id: p.slug })));
   } catch {
     return [];
   }
@@ -119,11 +122,15 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: product.accent }}/> {product.category}
               </span>
               <h1 className="font-display text-[28px] sm:text-[40px] uppercase tracking-[-.02em] leading-[.95] mt-4">{product.name}</h1>
-              <div className="flex items-center gap-2 text-[13px] text-muted mt-3" role="img" aria-label={`${t("common.rating")}: ${product.rating} / 5`}>
-                <span className="text-[#F4B400]" aria-hidden>★★★★★</span>
-                <span className="num-tabular">{product.rating}</span><span className="opacity-40" aria-hidden>·</span>
-                <span className="num-tabular">{product.reviews.toLocaleString()} {t("common.reviews")}</span>
-              </div>
+              {/* Only real reviews — no rating row until a product actually has some. */}
+              {product.reviews > 0 && (
+                <div className="flex items-center gap-2 text-[13px] text-muted mt-3" role="img" aria-label={`${t("common.rating")}: ${product.rating} / 5`}>
+                  <span className="text-[#F4B400]" aria-hidden>★★★★★</span>
+                  <span className="num-tabular">{product.rating}</span><span className="opacity-40" aria-hidden>·</span>
+                  <span className="num-tabular">{product.reviews.toLocaleString()} {t("common.reviews")}</span>
+                </div>
+              )}
+              {product.brand && <p className="text-[13px] font-semibold tracking-wide text-muted mt-3 uppercase">{product.brand}</p>}
 
               <div className="flex items-baseline gap-3 mt-5">
                 {new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1 && (

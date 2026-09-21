@@ -30,6 +30,19 @@ export type Product = {
   // `price` is the variant's own price (sizes of one perfume differ: 50ml vs
   // 150ml). Product.price is the lowest of them — a "from" price.
   variants?: { id: string; size: string; stock: number; price?: number }[];
+  brand?: string;
+  // EDP | EDT | Parfum | Extrait | Cologne | Mist | Set (metadata.fragrance_type)
+  fragranceType?: string;
+  createdAt?: string;
+};
+
+export type FacetCount = { key: string; count: number };
+export type ListResult = {
+  data: Product[];
+  total: number;
+  // Counts for the shop filters. Each facet is counted with every OTHER active
+  // filter applied, so a count is exactly what clicking that option returns.
+  facets?: { categories: FacetCount[]; brands: FacetCount[]; types: FacetCount[]; newCount: number };
 };
 
 export type CartItem = {

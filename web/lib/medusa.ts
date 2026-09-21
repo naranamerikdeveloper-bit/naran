@@ -1,5 +1,6 @@
-import type { Category, Product, User } from "./types";
+import type { Category, FacetCount, ListResult, Product, User } from "./types";
 import { ENRICH, DEFAULT_ENRICH } from "./enrich";
+import { TYPE_LABEL } from "./catalog";
 
 // Medusa category handle → storefront Category key. Taxonomy lives in Medusa
 // (product categories), so this scales to a 10k+ catalog with no per-product map.
@@ -14,7 +15,7 @@ const REGION = process.env.NEXT_PUBLIC_MEDUSA_REGION || "reg_01M0T6Q2HE0A9R8MHXT
 // (typo-tolerant, fast at 10k+). Falls back to Medusa's built-in `q` on any error.
 const MEILI_ENABLED = (process.env.NEXT_PUBLIC_MEILISEARCH ?? "") === "1";
 
-const FIELDS = "id,title,handle,description,thumbnail,*categories,*images,*options,*options.values,*variants,*variants.calculated_price,*variants.manage_inventory,*variants.inventory_items.inventory.location_levels.available_quantity";
+const FIELDS = "id,title,subtitle,handle,description,thumbnail,metadata,created_at,*categories,*images,*options,*options.values,*variants,*variants.calculated_price,*variants.manage_inventory,*variants.inventory_items.inventory.location_levels.available_quantity";
 const H = { "content-type": "application/json", "x-publishable-api-key": PK };
 
 // `revalidate` (seconds) makes the fetch cacheable → the calling page can render
@@ -108,7 +109,14 @@ async function fetchOrders(token: string): Promise<CustomerOrder[]> {
 
 function map(m: any): Product {
   const handle = m.handle as string;
+  // ENRICH only knows the original demo handles; the real catalog comes from
+  // Medusa metadata. Never fall back to DEFAULT_ENRICH's placeholder rating /
+  // review count for real products — that would show shoppers invented reviews.
+  const known = !!ENRICH[handle];
   const e = ENRICH[handle] || DEFAULT_ENRICH;
+  const meta = (m.metadata || {}) as Record<string, any>;
+  const brand: string | undefined = meta.brand || m.subtitle || undefined;
+  const fragranceType: string | undefined = meta.fragrance_type || undefined;
   // Category comes from Medusa's product categories (source of truth); the
   // enrich map is a fallback for products that predate the taxonomy.
   const catHandle = (m.categories || [])[0]?.handle as string | undefined;
@@ -143,21 +151,28 @@ function map(m: any): Product {
     slug: handle,
     name: m.title,
     category,
-    shape: e.shape,
+    shape: known ? e.shape : (category === "Gift" ? "giftset" : category === "Body" ? "lotion" : "perfume"),
     gender: e.gender,
     season: e.season,
     price,
-    was: e.wasMultiplier ? Math.round(price * e.wasMultiplier) : undefined,
-    rating: e.rating,
-    reviews: e.reviews,
-    badge: e.badge ?? null,
+    was: known && e.wasMultiplier ? Math.round(price * e.wasMultiplier) : undefined,
+    rating: known ? e.rating : 0,
+    reviews: known ? e.reviews : 0,
+    badge: meta.badge === "New" ? "New" : known ? (e.badge ?? null) : null,
     colors: [e.accent],
     sizes,
-    fabric: e.fabric,
+    fabric: (fragranceType && TYPE_LABEL[fragranceType]) || (known ? e.fabric : ""),
     shortDesc: description.slice(0, 90),
     description,
-    bullets: e.bullets,
-    specs: e.specs,
+    bullets: known ? e.bullets : [],
+    specs: known ? e.specs : Object.fromEntries(([
+      ["Брэнд", brand],
+      ["Төрөл", fragranceType ? TYPE_LABEL[fragranceType] : undefined],
+      ["Хэмжээ", sizes.length && sizes[0] !== "One size" ? sizes.join(" / ") : undefined],
+    ] as [string, string | undefined][]).filter(([, v]) => v) as [string, string][]),
+    brand,
+    fragranceType,
+    createdAt: m.created_at,
     stock,
     accent: e.accent,
     image: images[0],
@@ -225,37 +240,57 @@ function categoryIds(): Promise<Record<string, string>> {
 
 export const medusa = {
   products: {
-    list: async (params: Record<string, string | undefined> = {}) => {
-      const { category, q, sort, gender, filter, color, tech, minPrice, maxPrice } = params;
+    list: async (params: Record<string, string | undefined> = {}): Promise<ListResult> => {
+      const { category, q, sort, filter, minPrice, maxPrice } = params;
       const wantCat = category && category !== "all" ? category : undefined;
-      let list: Product[];
-      if (q) {
-        // Free-text search (MeiliSearch when enabled); category narrows the result set.
-        list = await searchProducts(q);
-        if (wantCat) list = list.filter(p => p.category === wantCat);
-      } else {
-        // Browse: category resolves to a Medusa id → filtered server-side (scales to 10k+).
-        const categoryId = wantCat ? (await categoryIds())[wantCat] : undefined;
-        list = await fetchCatalog(categoryId);
-        if (wantCat && !categoryId) list = list.filter(p => p.category === wantCat);
-      }
-      // A gender page also shows Unisex pieces.
-      if (gender) list = list.filter(p => p.gender === gender || p.gender === "Unisex");
-      if (filter === "new") list = list.filter(p => p.badge === "New");
-      if (filter === "sale") list = list.filter(p => p.badge === "Sale" || p.was != null);
-      if (color) { const c = color.toLowerCase(); list = list.filter(p => p.colors.some(x => x.toLowerCase() === c) || p.accent.toLowerCase() === c); }
-      if (tech) { const n = tech.toLowerCase(); list = list.filter(p => p.fabric.toLowerCase().includes(n) || p.bullets.some(b => b.toLowerCase().includes(n))); }
+      // Multi-select filters travel as comma lists: ?brand=CHANEL,DIOR&type=EDP
+      const brands = (params.brand || "").split(",").map(s => s.trim()).filter(Boolean);
+      const types = (params.type || "").split(",").map(s => s.trim()).filter(Boolean);
       const min = Number(minPrice), max = Number(maxPrice);
-      if (minPrice && !isNaN(min)) list = list.filter(p => p.price >= min);
-      if (maxPrice && !isNaN(max)) list = list.filter(p => p.price <= max);
-      // (free-text `q` already applied server-side)
+
+      // Base set = search results or the whole catalog. Only published products
+      // come back from the store API; image-less ones are drafts (hidden by the
+      // backend), and search results are re-checked for an image as well.
+      const base: Product[] = q ? (await searchProducts(q)).filter(p => !!p.image) : await fetchCatalog();
+
+      // Predicates, so each facet can be counted with all the OTHER filters on.
+      const byCat = (p: Product) => !wantCat || p.category === wantCat;
+      const byBrand = (p: Product) => !brands.length || (!!p.brand && brands.includes(p.brand));
+      const byType = (p: Product) => !types.length || (!!p.fragranceType && types.includes(p.fragranceType));
+      const byNew = (p: Product) => filter !== "new" || p.badge === "New";
+      const byPrice = (p: Product) =>
+        (!minPrice || isNaN(min) || p.price >= min) && (!maxPrice || isNaN(max) || p.price <= max);
+      const all = [byCat, byBrand, byType, byNew, byPrice];
+      const except = (skip: (p: Product) => boolean) => base.filter(p => all.every(f => f === skip || f(p)));
+      const tally = (items: Product[], key: (p: Product) => string | undefined): FacetCount[] => {
+        const m = new Map<string, number>();
+        for (const p of items) { const k = key(p); if (k) m.set(k, (m.get(k) || 0) + 1); }
+        return [...m].map(([k, count]) => ({ key: k, count }));
+      };
+
+      let list = base.filter(p => all.every(f => f(p)));
+      const byName = (a: Product, b: Product) => a.name.localeCompare(b.name);
       switch (sort) {
-        case "price-asc": list.sort((a, b) => a.price - b.price); break;
-        case "price-desc": list.sort((a, b) => b.price - a.price); break;
-        case "rating": list.sort((a, b) => b.rating - a.rating); break;
-        case "new": list = list.filter(p => p.badge === "New").concat(list.filter(p => p.badge !== "New")); break;
+        case "price-asc": list.sort((a, b) => a.price - b.price || byName(a, b)); break;
+        case "price-desc": list.sort((a, b) => b.price - a.price || byName(a, b)); break;
+        case "name": list.sort(byName); break;
+        case "brand": list.sort((a, b) => (a.brand || "").localeCompare(b.brand || "") || byName(a, b)); break;
+        case "new":
+          // "Шинэ"-marked first, then most recently added.
+          list.sort((a, b) => Number(b.badge === "New") - Number(a.badge === "New") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+          break;
       }
-      return { data: list, total: list.length };
+
+      return {
+        data: list,
+        total: list.length,
+        facets: {
+          categories: tally(except(byCat), p => p.category),
+          brands: tally(except(byBrand), p => p.brand).sort((a, b) => a.key.localeCompare(b.key)),
+          types: tally(except(byType), p => p.fragranceType).sort((a, b) => b.count - a.count),
+          newCount: except(byNew).filter(p => p.badge === "New").length,
+        },
+      };
     },
     featured: async () => {
       const { data } = await medusa.products.list({});

@@ -5,7 +5,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { ArrowRight, SearchIcon } from "@/components/Icons";
 import { api } from "@/lib/api";
 import { tFor, type Lang } from "@/lib/i18n";
-import type { Product } from "@/lib/types";
+import type { ListResult, Product } from "@/lib/types";
 import { SortSelect, ShopFilters } from "./_ShopControls";
 import { Reveal } from "@/app/[lang]/_components/Reveal";
 import type { Metadata } from "next";
@@ -19,8 +19,8 @@ export function generateMetadata({ params }: { params: { lang: Lang } }): Metada
   const t = tFor(params.lang);
   const title = `${t("shop.titleAccent")} — NARAN`;
   const description = params.lang === "mn"
-    ? "NARAN дэлгүүрийн бүх бүтээгдэхүүн — үнэртэй ус, арьс арчилгаа, гоо сайхан. 100% жинхэнэ, QPay-ээр төлнө."
-    : "Browse all NARAN products — fragrance, skincare and makeup. 100% authentic, pay with QPay.";
+    ? "Дэлхийн 78 брэндийн оригинал үнэртэй ус — Eau de Parfum, Eau de Toilette, бэлгийн багц. QPay-ээр төлнө."
+    : "Original fragrances from 78 houses — Eau de Parfum, Eau de Toilette and gift sets. Pay with QPay.";
   const url = `${SITE}/${params.lang}/shop`;
   return {
     title,
@@ -33,7 +33,7 @@ export function generateMetadata({ params }: { params: { lang: Lang } }): Metada
 const cats = ["all", "Fragrance", "Skincare", "Makeup", "Body", "Gift"];
 const PAGE_SIZE = 48;
 
-type ShopParams = { category?: string; sort?: string; q?: string; gender?: string; filter?: string; color?: string; tech?: string; minPrice?: string; maxPrice?: string; page?: string };
+type ShopParams = { category?: string; sort?: string; q?: string; brand?: string; type?: string; filter?: string; minPrice?: string; maxPrice?: string; page?: string };
 
 // Page links keep every active filter and only swap `page`.
 function pageHref(sp: ShopParams, page: number) {
@@ -71,26 +71,26 @@ export default async function ShopPage({
 }: { params: { lang: Lang }; searchParams: ShopParams }) {
   const t = tFor(params.lang);
   // Resilient: a catalog outage degrades to the empty state, never a 500.
-  const [listRes, allForColors] = await Promise.all([
-    api.products.list({
-      category: searchParams.category,
-      sort: searchParams.sort,
-      q: searchParams.q,
-      gender: searchParams.gender,
-      filter: searchParams.filter,
-      color: searchParams.color,
-      tech: searchParams.tech,
-      minPrice: searchParams.minPrice,
-      maxPrice: searchParams.maxPrice,
-    }).catch(() => ({ data: [] as Product[], total: 0 })),
-    api.products.list({}).catch(() => ({ data: [] as Product[] })),
-  ]);
+  const listRes: ListResult = await api.products.list({
+    category: searchParams.category,
+    sort: searchParams.sort,
+    q: searchParams.q,
+    brand: searchParams.brand,
+    type: searchParams.type,
+    filter: searchParams.filter,
+    minPrice: searchParams.minPrice,
+    maxPrice: searchParams.maxPrice,
+  }).catch(() => ({ data: [] as Product[], total: 0 }));
   const { data: all, total } = listRes;
+  const facets = listRes.facets ?? { categories: [], brands: [], types: [], newCount: 0 };
   const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
   const page = Math.min(pages, Math.max(1, Math.floor(Number(searchParams.page)) || 1));
   const products = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  // Real swatches: unique product accents, so every colour chip yields results.
-  const availableColors = Array.from(new Set(allForColors.data.map(p => p.accent)));
+  // Only categories that actually have products get a tab (an empty
+  // "Skincare" tab is a dead end); the active one always stays visible.
+  const catCount = new Map(facets.categories.map(c => [c.key, c.count]));
+  const tabs = cats.filter(c => c === "all" || (catCount.get(c) ?? 0) > 0 || searchParams.category === c);
+  const allCount = facets.categories.reduce((a, c) => a + c.count, 0);
 
   return (
     <>
@@ -115,14 +115,16 @@ export default async function ShopPage({
           <div className="sticky top-2 z-20 mt-5 -mx-3 px-3 sm:mx-0 sm:px-0">
             <div className="flex items-center gap-2 bg-white/80 backdrop-blur border border-line rounded-pill p-1.5 shadow-soft">
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar flex-1">
-                {cats.map(c => {
+                {tabs.map(c => {
                   const active = (!searchParams.category && c === "all") || searchParams.category === c;
+                  const n = c === "all" ? allCount : catCount.get(c) ?? 0;
                   return (
-                    <Link key={c} href={c === "all" ? "/shop" : `/shop?category=${encodeURIComponent(c)}`}
-                      className={`h-9 px-4 rounded-pill text-[13px] font-medium inline-flex items-center whitespace-nowrap shrink-0 transition ${
+                    <Link key={c} href={pageHref({ ...searchParams, category: c === "all" ? undefined : c }, 1)}
+                      className={`h-9 px-4 rounded-pill text-[13px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition ${
                         active ? "bg-ink text-white" : "text-muted hover:text-ink"
                       }`}>
                       {t(`cat.${c}`)}
+                      <span className={`text-[11px] num-tabular ${active ? "opacity-70" : "text-subtle"}`}>{n}</span>
                     </Link>
                   );
                 })}
@@ -134,7 +136,7 @@ export default async function ShopPage({
           </div>
 
           {/* Collapsible filters */}
-          <ShopFilters colors={availableColors}/>
+          <ShopFilters facets={facets}/>
 
           {/* Grid */}
           {products.length === 0 ? (

@@ -101,7 +101,8 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         <div className="flex items-start justify-between gap-2 mt-2.5 px-0.5">
           <div className="min-w-0">
             <div className="font-semibold text-[13px] sm:text-[14px] text-ink truncate leading-tight group-hover:text-accent-deep transition-colors">{product.name}</div>
-            <p className="tiny truncate mt-0.5">{t(`cat.${product.category}`)}</p>
+            {/* The name already carries the brand; the type (Eau de Parfum…) says more than the category. */}
+            <p className="tiny truncate mt-0.5">{product.fabric || t(`cat.${product.category}`)}</p>
           </div>
           <div className="text-right shrink-0">
             {new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1 && (

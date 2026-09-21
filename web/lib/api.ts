@@ -1,4 +1,4 @@
-import type { Product, Order, User } from "./types";
+import type { ListResult, Product, Order, User } from "./types";
 import { medusa } from "./medusa";
 
 const BASE = typeof window === "undefined"
@@ -18,13 +18,13 @@ async function json<T>(res: Response): Promise<T> {
 
 export const api = {
   products: {
-    list: async (params: Record<string, string | undefined> = {}) => {
+    list: async (params: Record<string, string | undefined> = {}): Promise<ListResult> => {
       if (USE_MEDUSA) return medusa.products.list(params);
       const qs = new URLSearchParams(
         Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
       ).toString();
       const r = await fetch(`${BASE}/api/products${qs ? `?${qs}` : ""}`, { cache: "no-store" });
-      return json<{ data: Product[]; total: number }>(r);
+      return json<ListResult>(r);
     },
     featured: async () => {
       if (USE_MEDUSA) return medusa.products.featured();

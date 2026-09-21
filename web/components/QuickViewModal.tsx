@@ -110,10 +110,12 @@ export function QuickViewModal() {
               </span>
               <h2 className="font-display text-[26px] sm:text-[30px] uppercase tracking-[-.02em] leading-[.98] mt-3">{product.name}</h2>
 
-              <div className="flex items-center gap-2 text-[13px] text-muted mt-2" role="img" aria-label={`${t("common.rating")}: ${product.rating} / 5`}>
-                <span className="text-[#F4B400]" aria-hidden>★★★★★</span>
-                <span className="num-tabular">{product.rating}</span>
-              </div>
+              {product.reviews > 0 && (
+                <div className="flex items-center gap-2 text-[13px] text-muted mt-2" role="img" aria-label={`${t("common.rating")}: ${product.rating} / 5`}>
+                  <span className="text-[#F4B400]" aria-hidden>★★★★★</span>
+                  <span className="num-tabular">{product.rating}</span>
+                </div>
+              )}
 
               <div className="flex items-baseline gap-3 mt-4">
                 <span className="font-display text-[26px] text-accent-deep">{money(product.price)}</span>
