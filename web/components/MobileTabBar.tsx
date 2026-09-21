@@ -16,7 +16,7 @@ export function MobileTabBar() {
     { href: "/account",  label: t("tab.me"),   icon: UserIcon },
   ];
   return (
-    <nav className="lg:hidden fixed bottom-4 inset-x-4 z-40 bg-ink text-white rounded-pill p-2 flex justify-around items-center shadow-deep">
+    <nav className="lg:hidden fixed bottom-4 inset-x-4 z-40 bg-accent-deep text-white rounded-pill p-2 flex justify-around items-center shadow-deep">
       {items.map(({ href, label, icon: Icon }) => {
         const active = path === href || (href !== "/" && path.startsWith(href));
         return (

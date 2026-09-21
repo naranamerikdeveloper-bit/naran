@@ -132,8 +132,8 @@ export default function AccountPage() {
             className="mt-6 bg-white border border-line rounded-3xl p-5 sm:p-7 shadow-soft"
           >
             <div className="flex items-center gap-4">
-              <span className="w-16 h-16 rounded-full grid place-items-center text-white font-display text-[22px] shadow-[0_10px_24px_-8px_rgba(174, 34, 87,.55)]"
-                style={{ background: "linear-gradient(135deg,#F07CA5,#AE2257)" }}>
+              <span className="w-16 h-16 rounded-full grid place-items-center text-white font-display text-[22px] shadow-[0_10px_24px_-8px_rgba(143,75,64,.55)]"
+                style={{ background: "linear-gradient(135deg,#D8A092,#8F4B40)" }}>
                 {user.firstName?.[0]}{user.lastName?.[0]}
               </span>
               <div className="min-w-0">
@@ -161,7 +161,7 @@ export default function AccountPage() {
                   className="relative h-9 px-4 rounded-pill text-[13px] font-medium whitespace-nowrap shrink-0 active:scale-95 transition-transform">
                   {tab === tb && (
                     <motion.span layoutId="acctTabPill" transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                      className="absolute inset-0 bg-ink rounded-pill"/>
+                      className="absolute inset-0 bg-accent-deep rounded-pill"/>
                   )}
                   <span className={`relative z-10 transition-colors ${tab === tb ? "text-white" : "text-muted hover:text-ink"}`}>{t(TAB_KEY[tb])}</span>
                 </button>

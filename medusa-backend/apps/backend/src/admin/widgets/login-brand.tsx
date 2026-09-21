@@ -17,8 +17,8 @@ const LoginBrand = () => {
   return (
     <div className="mb-6 flex flex-col items-center gap-3.5 text-center">
       <span
-        className="grid h-16 w-16 place-items-center rounded-[1.35rem] shadow-[0_14px_30px_-8px_rgba(174, 34, 87,.6)]"
-        style={{ background: "linear-gradient(135deg,#F07CA5 0%,#AE2257 100%)" }}
+        className="grid h-16 w-16 place-items-center rounded-[1.35rem] shadow-[0_14px_30px_-8px_rgba(143,75,64,.6)]"
+        style={{ background: "linear-gradient(135deg,#D8A092 0%,#8F4B40 100%)" }}
       >
         <Sun />
       </span>

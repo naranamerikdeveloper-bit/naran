@@ -141,7 +141,7 @@ export function ShopFilters({ facets }: { facets: Facets }) {
                 return (
                   <button key={key} onClick={() => setParams({ type: toggleIn(types, key).join(",") || null })} aria-pressed={on}
                     className={`text-[12px] px-3 h-8 rounded-pill inline-flex items-center gap-1.5 transition ${
-                      on ? "bg-ink text-white" : "bg-surface-2 text-muted hover:text-ink"}`}>
+                      on ? "bg-accent-deep text-white" : "bg-surface-2 text-muted hover:text-ink"}`}>
                     {typeName(key)} <span className={`num-tabular ${on ? "opacity-70" : "text-subtle"}`}>{count}</span>
                   </button>
                 );
@@ -189,7 +189,7 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function Chip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-pill bg-ink text-white text-[12px] font-medium">
+    <span className="inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-pill bg-accent-deep text-white text-[12px] font-medium">
       {children}
       <button onClick={onRemove} aria-label="Remove" className="w-5 h-5 rounded-full grid place-items-center hover:bg-white/20">×</button>
     </span>

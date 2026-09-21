@@ -217,14 +217,14 @@ export default function CheckoutPage() {
             <FormCard title={t("co.payment")} i={3}>
               <div className="border-2 border-ink rounded-xl p-4 flex items-center gap-3.5 bg-surface-2">
                 <input type="radio" name="pay" checked readOnly className="sr-only"/>
-                <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center border-2 border-ink bg-ink" aria-hidden>
+                <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center border-2 border-accent-deep bg-accent-deep" aria-hidden>
                   <span className="w-2 h-2 rounded-full bg-white"/>
                 </span>
                 <div className="flex-1">
                   <div className="font-semibold">{t("co.wireTitle")}</div>
                   <div className="tiny">{t("co.wireSub")}</div>
                 </div>
-                <span className="px-2.5 h-7 grid place-items-center rounded-pill bg-ink text-white text-[11px] font-bold tracking-wide">QPay</span>
+                <span className="px-2.5 h-7 grid place-items-center rounded-pill bg-accent-deep text-white text-[11px] font-bold tracking-wide">QPay</span>
               </div>
               <div className="mt-3 flex items-center gap-2 text-[12px] text-muted">
                 <LockIcon width={14} height={14}/> {t("co.wireNote")}
@@ -328,7 +328,7 @@ function Step({ n, label, active, done }: { n: number; label: string; active?: b
   return (
     <div className={`flex items-center gap-2.5 font-medium ${active ? "text-ink" : done ? "text-ink" : "text-subtle"}`}>
       <span className={`w-6.5 h-6.5 rounded-full grid place-items-center text-xs ${
-        done ? "bg-green-600 text-white" : active ? "bg-ink text-white" : "bg-surface-2"
+        done ? "bg-green-600 text-white" : active ? "bg-accent-deep text-white" : "bg-surface-2"
       }`} style={{ width: 26, height: 26 }}>{n}</span>
       {label}
     </div>
@@ -365,7 +365,7 @@ function Radio({ name, title, sub, right, checked, onChange }: { name: string; t
   return (
     <label className={`border rounded-xl p-4 flex items-center gap-3.5 cursor-pointer mb-2.5 transition-all duration-200 ease-elegant active:scale-[.99] ${checked ? "border-ink bg-surface-2 shadow-soft" : "border-border hover:border-ink/40 hover:-translate-y-px"}`}>
       <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only"/>
-      <span className={`shrink-0 w-5 h-5 rounded-full grid place-items-center border-2 transition-colors duration-200 ${checked ? "border-ink bg-ink" : "border-ink/25"}`}>
+      <span className={`shrink-0 w-5 h-5 rounded-full grid place-items-center border-2 transition-colors duration-200 ${checked ? "border-accent-deep bg-accent-deep" : "border-ink/25"}`}>
         {checked && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} className="w-2 h-2 rounded-full bg-white"/>}
       </span>
       <div className="flex-1">

@@ -20,9 +20,10 @@ const config: Config = {
         cloud:     "#EDEDEF",
         mist:      "#F0F0F2",
         paper:     "#FFFFFF",
-        accent:    { DEFAULT: "#D1356F", deep: "#AE2257", soft: "#FCE7EF" },
-        // Floral rose palette: petal = light pink for gradients/decoration.
-        petal:     { DEFAULT: "#F6B3CB", light: "#FFF1F6" },
+        accent:    { DEFAULT: "#AE6255", deep: "#8F4B40", soft: "#F6E4DF" },
+        // Soft coral-peach palette (pastel perfume-ad look): accent = coral button
+        // colour tuned to 4.5:1 with white text; petal = light peach for highlights.
+        petal:     { DEFAULT: "#E8B4A8", light: "#FBF2EF" },
         lime:      { DEFAULT: "#D7F26B", deep: "#BFE03E", dark: "#9FBF24" },
         camel:     { DEFAULT: "#C19A6B", deep: "#A87E4E" },
         muted:     "#5C5F63",

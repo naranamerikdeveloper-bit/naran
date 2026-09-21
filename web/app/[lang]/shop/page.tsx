@@ -56,7 +56,7 @@ function Pager({ sp, page, pages }: { sp: ShopParams; page: number; pages: numbe
         <span key={n} className="contents">
           {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-subtle">…</span>}
           {n === page
-            ? <span aria-current="page" className={`${cell} bg-ink text-white`}>{n}</span>
+            ? <span aria-current="page" className={`${cell} bg-accent-deep text-white`}>{n}</span>
             : <Link href={pageHref(sp, n)} className={`${cell} border border-line bg-white hover:border-ink`}>{n}</Link>}
         </span>
       ))}
@@ -121,7 +121,7 @@ export default async function ShopPage({
                   return (
                     <Link key={c} href={pageHref({ ...searchParams, category: c === "all" ? undefined : c }, 1)}
                       className={`h-9 px-4 rounded-pill text-[13px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition ${
-                        active ? "bg-ink text-white" : "text-muted hover:text-ink"
+                        active ? "bg-accent-deep text-white" : "text-muted hover:text-ink"
                       }`}>
                       {t(`cat.${c}`)}
                       <span className={`text-[11px] num-tabular ${active ? "opacity-70" : "text-subtle"}`}>{n}</span>

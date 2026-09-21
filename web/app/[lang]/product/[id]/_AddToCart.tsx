@@ -48,7 +48,7 @@ export function AddToCart({ product }: { product: Product }) {
                 <button key={s} disabled={out} onClick={() => !out && setSize(s)}
                   className={`min-w-[52px] px-4 py-2.5 rounded-pill border text-sm transition ${
                     out ? "border-border bg-surface-2 text-subtle line-through cursor-not-allowed"
-                    : size === s ? "bg-ink text-white border-ink" : "border-border bg-white hover:border-ink"
+                    : size === s ? "bg-accent-deep text-white border-accent-deep" : "border-border bg-white hover:border-ink"
                   }`}>
                   {s}
                   {hasRange && <span className="ml-1.5 opacity-70 num-tabular">{money(priceOf(s))}</span>}
@@ -86,7 +86,7 @@ export function AddToCart({ product }: { product: Product }) {
             className="btn flex-1 justify-center bg-white text-ink border border-ink/15 hover:border-ink hover:-translate-y-0.5 transition-all"
           >
             {t("common.buyNow")}
-            <span className="arrow-cap !bg-ink !text-white"><ArrowUpRight width={14} height={14}/></span>
+            <span className="arrow-cap !bg-accent-deep !text-white"><ArrowUpRight width={14} height={14}/></span>
           </button>
         </div>
       )}

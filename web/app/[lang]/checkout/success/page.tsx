@@ -9,7 +9,7 @@ import { CountUp } from "@/components/CountUp";
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
 type Piece = { x: number; y: number; rot: number; color: string; size: number; delay: number };
-const CONFETTI_COLORS = ["#D1356F", "#AE2257", "#D7F26B", "#0E0F10", "#F6B3CB"];
+const CONFETTI_COLORS = ["#AE6255", "#8F4B40", "#D7F26B", "#0E0F10", "#E8B4A8"];
 function makeConfetti(): Piece[] {
   return Array.from({ length: 18 }, (_, i) => {
     const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.5;

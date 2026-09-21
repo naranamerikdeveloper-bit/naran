@@ -181,7 +181,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
       <section className="pb-16 lg:pb-24">
         <div className="container">
           <Reveal blur
-            className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(174,34,87,.35)]">
+            className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(143,75,64,.35)]">
             {/* faint warm corner bloom — matches the footer */}
             <div className="pointer-events-none absolute -top-24 right-[8%] h-56 w-56 rounded-full bg-accent/10 blur-3xl"/>
             <div className="relative z-10">

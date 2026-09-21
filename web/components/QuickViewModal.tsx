@@ -136,7 +136,7 @@ export function QuickViewModal() {
                         <button key={s} disabled={out} onClick={() => !out && setSize(s)}
                           className={`min-w-[48px] px-3.5 py-2 rounded-pill border text-sm transition ${
                             out ? "border-line bg-surface-2 text-subtle line-through cursor-not-allowed"
-                            : size === s ? "bg-ink text-white border-ink" : "border-line bg-white hover:border-ink"
+                            : size === s ? "bg-accent-deep text-white border-accent-deep" : "border-line bg-white hover:border-ink"
                           }`}>
                           {s}
                           {hasRange && <span className="ml-1.5 opacity-70 num-tabular">{money(priceOf(s))}</span>}
@@ -156,7 +156,7 @@ export function QuickViewModal() {
                 <Link href={`/product/${product.slug}`} onClick={close}
                   className="btn btn-outline w-full justify-center">
                   {t("common.viewDetails")}
-                  <span className="arrow-cap !bg-ink !text-white"><ArrowUpRight width={14} height={14}/></span>
+                  <span className="arrow-cap !bg-accent-deep !text-white"><ArrowUpRight width={14} height={14}/></span>
                 </Link>
               </div>
             </div>

@@ -14,10 +14,15 @@ import { useEffect } from "react";
  */
 const BRAND_CSS = `
 :root {
-  --fg-interactive: rgba(209, 53, 111, 1) !important;        /* #D1356F */
-  --fg-interactive-hover: rgba(174, 34, 87, 1) !important;   /* #AE2257 */
-  --bg-interactive: rgba(174, 34, 87, 1) !important;
-  --border-interactive: rgba(174, 34, 87, 1) !important;
+  --fg-interactive: rgba(174,98,85, 1) !important;        /* #AE6255 */
+  --fg-interactive-hover: rgba(143,75,64, 1) !important;   /* #8F4B40 */
+  --bg-interactive: rgba(143,75,64, 1) !important;
+  --border-interactive: rgba(143,75,64, 1) !important;
+  /* Primary ("inverted", black by default) buttons → deep coral, white label. */
+  --button-inverted: rgba(143,75,64, 1) !important;
+  --button-inverted-hover: rgba(122,63,53, 1) !important;
+  --button-inverted-pressed: rgba(105,54,45, 1) !important;
+  --contrast-fg-primary: rgba(255,255,255, 1) !important;
 }
 /* Login page: hide Medusa's default logo + "Welcome to Medusa" heading/subtitle
    (the first two children of the max-w-[280px] login column) so the NARAN sign-in
@@ -32,7 +37,7 @@ const BRAND_CSS = `
    Medusa's (minified) active class names. Best-effort: no-op if absent. */
 nav a[aria-current="page"] {
   color: var(--fg-interactive) !important;
-  background-image: linear-gradient(rgba(174, 34, 87,.08), rgba(174, 34, 87,.08)) !important;
+  background-image: linear-gradient(rgba(143,75,64,.08), rgba(143,75,64,.08)) !important;
   box-shadow: inset 2px 0 0 0 var(--fg-interactive) !important;
 }
 nav a[aria-current="page"] svg {
@@ -45,7 +50,7 @@ nav a[aria-current="page"] svg {
 [class*="1fr_15px"] > :first-child > * {
   background-image:
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23fff'%20stroke-width='2.2'%20stroke-linecap='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='4.2'%20fill='%23fff'/%3E%3Cpath%20d='M12%203v2M12%2019v2M5%205l1.5%201.5M17.5%2017.5L19%2019M3%2012h2M19%2012h2M5%2019l1.5-1.5M17.5%206.5L19%205'/%3E%3C/svg%3E"),
-    linear-gradient(135deg, #F07CA5 0%, #AE2257 100%) !important;
+    linear-gradient(135deg, #D8A092 0%, #8F4B40 100%) !important;
   background-size: 66% 66%, cover !important;
   background-position: center, center !important;
   background-repeat: no-repeat, no-repeat !important;
