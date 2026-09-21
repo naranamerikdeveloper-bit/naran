@@ -60,10 +60,10 @@ function ResetInner() {
 
   return (
     <div className="min-h-screen grid place-items-center px-4 py-10 sm:py-14" style={{ background: "linear-gradient(160deg, #FFFFFF 0%, #FDF3EC 100%)" }}>
-      <div className="relative w-full max-w-[440px] overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] bg-white shadow-[0_40px_90px_-30px_rgba(143,75,64,.30)] ring-1 ring-black/5 px-7 sm:px-10 py-10 sm:py-12">
+      <div className="relative w-full max-w-[440px] overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] bg-white shadow-[0_40px_90px_-30px_rgba(211,90,76,.30)] ring-1 ring-black/5 px-7 sm:px-10 py-10 sm:py-12">
         <div className="flex items-center justify-center">
-          <span className="grid h-11 w-11 place-items-center rounded-full text-white shadow-[0_10px_24px_-8px_rgba(174,98,85,.6)]"
-            style={{ background: "linear-gradient(135deg, #D39486, #8F4B40)" }}>
+          <span className="grid h-11 w-11 place-items-center rounded-full text-white shadow-[0_10px_24px_-8px_rgba(231,111,97,.6)]"
+            style={{ background: "linear-gradient(135deg, #EF8E80, #D35A4C)" }}>
             {done ? <CheckIcon width={22} height={22} /> : <LockIcon width={20} height={20} />}
           </span>
         </div>
@@ -74,7 +74,7 @@ function ResetInner() {
             <p className="mt-2 text-[14px] leading-relaxed text-muted">{t("reset.successDesc")}</p>
             <button type="button" onClick={() => router.push(`/${lang}/auth`)}
               className="mt-7 w-full h-[50px] rounded-full text-white font-semibold uppercase tracking-[.12em] text-[13px] grid place-items-center transition active:scale-[.99]"
-              style={{ background: "linear-gradient(95deg, #D39486 0%, #8F4B40 100%)" }}>
+              style={{ background: "linear-gradient(95deg, #EF8E80 0%, #D35A4C 100%)" }}>
               {t("reset.goToSignIn")}
             </button>
           </div>
@@ -84,7 +84,7 @@ function ResetInner() {
             <p className="mt-2 text-[14px] leading-relaxed text-muted">{t("reset.invalidDesc")}</p>
             <Link href="/auth"
               className="mt-7 inline-grid w-full h-[50px] place-items-center rounded-full text-white font-semibold uppercase tracking-[.12em] text-[13px] transition active:scale-[.99]"
-              style={{ background: "linear-gradient(95deg, #D39486 0%, #8F4B40 100%)" }}>
+              style={{ background: "linear-gradient(95deg, #EF8E80 0%, #D35A4C 100%)" }}>
               {t("reset.requestNew")}
             </Link>
           </div>
@@ -122,7 +122,7 @@ function ResetInner() {
 
               <button disabled={busy} type="submit"
                 className="w-full h-[50px] rounded-full text-white font-semibold uppercase tracking-[.12em] text-[13px] grid place-items-center disabled:opacity-60 transition active:scale-[.99]"
-                style={{ background: "linear-gradient(95deg, #D39486 0%, #8F4B40 100%)" }}>
+                style={{ background: "linear-gradient(95deg, #EF8E80 0%, #D35A4C 100%)" }}>
                 {busy ? t("reset.updating") : t("reset.submit")}
               </button>
             </form>
@@ -146,7 +146,7 @@ function Field({ label, error, right, labelRight, name, ...props }: {
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>
-      <div className={`rounded-2xl border px-4 py-2 bg-white transition focus-within:border-[#AE6255] focus-within:ring-4 focus-within:ring-[#AE6255]/10 ${error ? "border-red-400" : "border-line"}`}>
+      <div className={`rounded-2xl border px-4 py-2 bg-white transition focus-within:border-[#E76F61] focus-within:ring-4 focus-within:ring-[#E76F61]/10 ${error ? "border-red-400" : "border-line"}`}>
         <div className="flex items-center justify-between">
           <label htmlFor={name} className="block text-[11px] font-medium text-subtle">{label}</label>
           {labelRight}

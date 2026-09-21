@@ -132,8 +132,8 @@ export default function AccountPage() {
             className="mt-6 bg-white border border-line rounded-3xl p-5 sm:p-7 shadow-soft"
           >
             <div className="flex items-center gap-4">
-              <span className="w-16 h-16 rounded-full grid place-items-center text-white font-display text-[22px] shadow-[0_10px_24px_-8px_rgba(143,75,64,.55)]"
-                style={{ background: "linear-gradient(135deg,#D8A092,#8F4B40)" }}>
+              <span className="w-16 h-16 rounded-full grid place-items-center text-white font-display text-[22px] shadow-[0_10px_24px_-8px_rgba(211,90,76,.55)]"
+                style={{ background: "linear-gradient(135deg,#F4A597,#D35A4C)" }}>
                 {user.firstName?.[0]}{user.lastName?.[0]}
               </span>
               <div className="min-w-0">
