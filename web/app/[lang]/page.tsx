@@ -40,10 +40,6 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   // transient Medusa error) — never dereference it directly (H2).
   const hot = products.find(p => p.badge === "Sale") || products[0];
   const hotImg = hot ? (hot.image ?? productImg(hot.id)) : HERO_IMG;
-  // Real brands for the marquee, most-stocked first.
-  const brandCount = new Map<string, number>();
-  for (const p of products) if (p.brand) brandCount.set(p.brand, (brandCount.get(p.brand) || 0) + 1);
-  const brands = [...brandCount].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([b]) => b);
 
   const defaultSlides: Slide[] = [
     { kicker: t("home.s1Kicker"), top: t("home.s1Top"), accent: t("home.s1Accent"), desc: t("home.s1Desc"), img: FILM_IMG, href: "/shop" },
@@ -127,8 +123,8 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
       </div>
 
       {/* ===================== MARQUEE ===================== */}
-      <section className="relative overflow-hidden py-12 sm:py-20 mt-10 sm:mt-14 border-y border-accent/10 bg-[radial-gradient(900px_280px_at_50%_0%,#FFEDE8_0%,transparent_70%),radial-gradient(700px_240px_at_50%_100%,#FFF4F1_0%,transparent_70%)]">
-        <Marquee items={[t("home.mqA"), "NARAN", t("home.mqB"), "NARAN", t("home.mqC"), "NARAN", t("home.mqD"), "NARAN"]} brands={brands} />
+      <section className="py-12 sm:py-16 mt-10 sm:mt-14 border-y border-line bg-white">
+        <Marquee kicker={t("home.brandsKicker")} />
       </section>
 
       {/* ===================== PROMO BANNER ===================== */}
