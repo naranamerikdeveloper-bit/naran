@@ -2,7 +2,7 @@ import { LocaleLink as Link } from "@/components/LocaleLink";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
-import type { Product } from "@/lib/types";
+import type { ListResult } from "@/lib/types";
 import { Photo } from "@/components/Photo";
 import { HeroCarousel, type Slide } from "@/components/HeroCarousel";
 import { ArrowUpRight, ArrowRight } from "@/components/Icons";
@@ -18,11 +18,17 @@ import { tFor, type Lang } from "@/lib/i18n";
 
 export const revalidate = 300;
 
-const CATS = [
-  { key: "cat.all",        href: "/shop",                     img: HERO_IMG },
-  { key: "cat.Fragrance",  href: "/shop?category=Fragrance",  img: PRODUCT_IMG.p1 },
-  { key: "cat.Body",       href: "/shop?category=Body",       img: PRODUCT_IMG.p3 },
-  { key: "cat.Gift",       href: "/shop?category=Gift",       img: PRODUCT_IMG.p5 },
+// Category bento candidates, in display order: fragrance types first (almost
+// the whole catalog is fragrance), then non-fragrance categories. Only the
+// populated ones are shown.
+const TILES: { kind: "type" | "cat"; key: string; label: string; href: string }[] = [
+  { kind: "type", key: "EDP",     label: "nav.edp",  href: "/shop?type=EDP" },
+  { kind: "type", key: "EDT",     label: "nav.edt",  href: "/shop?type=EDT" },
+  { kind: "cat",  key: "Body",    label: "cat.Body", href: "/shop?category=Body" },
+  { kind: "cat",  key: "Gift",    label: "cat.Gift", href: "/shop?category=Gift" },
+  { kind: "type", key: "Parfum",  label: "home.tParfum", href: "/shop?type=Parfum" },
+  { kind: "type", key: "Extrait", label: "home.tExtrait", href: "/shop?type=Extrait" },
+  { kind: "type", key: "Cologne", label: "home.tCologne", href: "/shop?type=Cologne" },
 ];
 
 export default async function HomePage({ params }: { params: { lang: Lang } }) {
@@ -32,7 +38,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   // build (mirrors generateStaticParams' catch elsewhere). The page prerenders
   // with whatever it got and ISR (revalidate) backfills once the backend is up.
   const [productsRes, cms] = await Promise.all([
-    api.products.list({}).catch(() => ({ data: [] as Product[] })),
+    api.products.list({}).catch((): ListResult => ({ data: [], total: 0 })),
     medusa.homepageContent(),
   ]);
   const products = productsRes.data;
@@ -40,6 +46,25 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   // transient Medusa error) — never dereference it directly (H2).
   const hot = products.find(p => p.badge === "Sale") || products[0];
   const hotImg = hot ? (hot.image ?? productImg(hot.id)) : HERO_IMG;
+
+  // Category bento: live counts + a real product photo per tile.
+  const facets = productsRes.facets;
+  const countOf = (kind: "type" | "cat", key: string) =>
+    (kind === "type" ? facets?.types : facets?.categories)?.find(f => f.key === key)?.count ?? 0;
+  const picOf = (kind: "type" | "cat", key: string) =>
+    products.find(p => p.image && (kind === "type" ? p.fragranceType === key : p.category === key))?.image;
+  const brandTotal = facets?.brands.length ?? 0;
+  const catFeature = {
+    label: t("home.shopAll"),
+    sub: `${products.length} ${t("home.items")}${brandTotal ? ` · ${brandTotal} ${t("home.brands")}` : ""}`,
+    href: "/shop",
+    img: HERO_IMG,
+  };
+  const catTiles = TILES
+    .map(c => ({ ...c, n: countOf(c.kind, c.key) }))
+    .filter(c => c.n > 0)
+    .slice(0, 3)
+    .map(c => ({ label: t(c.label), sub: `${c.n} ${t("home.items")}`, href: c.href, img: picOf(c.kind, c.key) }));
 
   const defaultSlides: Slide[] = [
     { kicker: t("home.s1Kicker"), top: t("home.s1Top"), accent: t("home.s1Accent"), desc: t("home.s1Desc"), img: FILM_IMG, href: "/shop" },
@@ -97,12 +122,15 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
 
           {/* ===================== CATEGORY ===================== */}
           <section className="mt-10 sm:mt-12">
-            <Reveal className="flex items-end justify-between mb-5">
-              <h2 className="font-display text-[24px] sm:text-[28px] tracking-tight">{t("home.category")}</h2>
+            <Reveal className="flex items-end justify-between mb-5 sm:mb-6">
+              <div>
+                <div className="text-[11px] sm:text-[12px] font-semibold uppercase tracking-[.24em] text-accent mb-1.5">{t("home.catKicker")}</div>
+                <h2 className="font-display text-[26px] sm:text-[34px] tracking-tight leading-none">{t("home.category")}</h2>
+              </div>
               <Link href="/shop" className="text-accent text-[13px] font-semibold hover:text-accent-deep transition-colors">{t("common.seeAll")}</Link>
             </Reveal>
             <Reveal delay={0.08}>
-              <CategoryRail items={CATS.map(c => ({ label: t(c.key), href: c.href, img: c.img }))} />
+              <CategoryRail feature={catFeature} items={catTiles} />
             </Reveal>
           </section>
 
