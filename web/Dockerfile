@@ -21,7 +21,12 @@ ARG NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_GA_ID
 ARG NEXT_PUBLIC_META_PIXEL_ID
 ARG NEXT_PUBLIC_SENTRY_DSN
-ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+# R2/CDN host for product images. next.config.js adds it to images.remotePatterns,
+# which is frozen into the standalone build — without it at BUILD time every R2
+# image is rejected by /_next/image ("url" parameter is not allowed).
+ARG S3_FILE_URL
+ENV S3_FILE_URL=$S3_FILE_URL \
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
     NEXT_PUBLIC_MEDUSA_URL=$NEXT_PUBLIC_MEDUSA_URL \
     NEXT_PUBLIC_MEDUSA_PK=$NEXT_PUBLIC_MEDUSA_PK \
     NEXT_PUBLIC_MEDUSA_REGION=$NEXT_PUBLIC_MEDUSA_REGION \
