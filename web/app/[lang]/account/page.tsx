@@ -216,13 +216,13 @@ export default function AccountPage() {
 
             {tab === "Wishlist" && (
               loadingProducts ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 gap-y-8 sm:gap-x-5 sm:gap-y-11 lg:gap-x-6 lg:gap-y-12">
                   {[0, 1, 2, 3].map(i => <Skeleton key={i} className="aspect-[4/5] rounded-[1.4rem]"/>)}
                 </div>
               ) : wished.length === 0 ? (
                 <Card><Empty msg={t("acc.wishEmpty")} cta/></Card>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 gap-y-8 sm:gap-x-5 sm:gap-y-11 lg:gap-x-6 lg:gap-y-12">
                   {wished.map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
                 </div>
               )

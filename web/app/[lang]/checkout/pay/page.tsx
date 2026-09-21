@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCart, useOrders } from "@/lib/store";
 import { useT, useLang } from "@/components/LangProvider";
 import { money } from "@/lib/api";
+
+const PAY_WINDOW_MS = 30 * 60_000;
 import { botxon, type BotxonBankUrl } from "@/lib/botxon";
 
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
@@ -42,6 +44,13 @@ function Pay() {
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState(false);
   const done = useRef(false);
+  // Remaining time on the payment window, shown under the QR.
+  const [left, setLeft] = useState(PAY_WINDOW_MS);
+  useEffect(() => {
+    const end = Date.now() + PAY_WINDOW_MS;
+    const id = setInterval(() => setLeft(Math.max(0, end - Date.now())), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Load the QR/deeplinks the checkout page stashed (instant render, offline-safe).
   // Depend only on `inv` — `t` from useT() is a fresh function each render, so
@@ -58,7 +67,10 @@ function Pay() {
   // Poll payment status; the server settles the order via webhook or this poll.
   useEffect(() => {
     if (!inv) return;
-    let tries = 0;
+    // The shopper gets ~30 minutes to pay. Polling is every 3 s for the first
+    // 5 minutes, then every 6 s; transient errors never end the session early.
+    const started = Date.now();
+    let errors = 0;
     const tick = async () => {
       if (done.current) return;
       try {
@@ -92,11 +104,13 @@ function Pay() {
           setError(t("pay.failed"));
           return;
         }
-      } catch (e: any) {
-        if (++tries > 3) { setError(e.message || t("proc.verifyFailed")); return; }
+        errors = 0;
+      } catch {
+        errors++;
       }
-      if (++tries > 120) { setError(t("proc.timeout")); return; } // ~4 min
-      setTimeout(tick, 2000);
+      const elapsed = Date.now() - started;
+      if (elapsed > PAY_WINDOW_MS) { setError(t("proc.timeout")); return; }
+      setTimeout(tick, elapsed < 5 * 60_000 ? 3000 : errors > 5 ? 10_000 : 6000);
     };
     tick();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +202,9 @@ function Pay() {
 
       <div className="mt-6 inline-flex items-center gap-2 text-[12px] text-muted bg-surface-2 px-3 py-1.5 rounded-pill">
         <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> {t("pay.waiting")}
+        <span className="num-tabular font-semibold text-ink/70">· {Math.floor(left / 60000)}:{String(Math.floor(left / 1000) % 60).padStart(2, "0")}</span>
       </div>
+      <p className="tiny text-muted mt-2">{t("pay.window")}</p>
     </Shell>
   );
 }

@@ -389,6 +389,13 @@ router.get("/botxon/invoice", async (req, res) => {
     res.json({ data: { status, order: publicOrder(rec.order), invoice: rec.invoice ?? null } });
   } catch (e: any) {
     console.error("botxon settle error:", e.message);
+    // A transient gateway error must not end the customer's payment session:
+    // for an invoice we issued, keep reporting "pending" so the QR stays up and
+    // the next poll (or the webhook) can still settle it.
+    const known = invoices.get(id);
+    if (known && known.status !== "failed") {
+      return res.json({ data: { status: "pending", order: null, invoice: known.invoice ?? null } });
+    }
     res.status(502).json({ error: "Could not verify payment" });
   }
 });

@@ -98,15 +98,15 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
         </div>
 
         {/* info — clean editorial row below the image */}
-        <div className="flex items-start justify-between gap-2 mt-2.5 px-0.5">
+        <div className="flex items-start justify-between gap-3 mt-3.5 px-0.5">
           <div className="min-w-0">
-            <div className="font-semibold text-[13px] sm:text-[14px] text-ink truncate leading-tight group-hover:text-accent-deep transition-colors">{product.name}</div>
+            <div className="font-semibold text-[13px] sm:text-[14px] text-ink truncate leading-snug group-hover:text-accent-deep transition-colors">{product.name}</div>
             {/* The name already carries the brand; the type (Eau de Parfum…) says more than the category. */}
-            <p className="tiny truncate mt-0.5">{product.fabric || t(`cat.${product.category}`)}</p>
+            <p className="tiny truncate mt-1">{product.fabric || t(`cat.${product.category}`)}</p>
           </div>
           <div className="text-right shrink-0">
             {new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1 && (
-              <span className="tiny block leading-tight">{t("common.from")}</span>
+              <span className="tiny block leading-tight mb-0.5">{t("common.from")}</span>
             )}
             <span className="font-display text-[15px] sm:text-[16px] num-tabular block leading-tight">{money(product.price)}</span>
             {product.was && <span className="tiny line-through num-tabular">{money(product.was)}</span>}

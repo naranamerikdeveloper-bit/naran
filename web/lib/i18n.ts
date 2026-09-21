@@ -151,7 +151,8 @@ const en: Dict = {
   "shop.titlePre": "", "shop.titleAccent": "Products",
   // processing
   "proc.missingRef": "Missing payment reference", "proc.verifyFailed": "Payment verification failed",
-  "proc.timeout": "Payment is taking longer than expected.", "proc.pendingTitle": "Payment pending",
+  "pay.window": "You have 30 minutes to pay — this page confirms automatically.",
+  "proc.timeout": "The 30-minute payment window has ended. Please go back to your bag and try again.", "proc.pendingTitle": "Payment pending",
   "proc.reviewTitle": "Payment received", "proc.reviewDesc": "We've received your payment and are confirming your order. Our team will email you shortly — you have not been charged twice.", "proc.reviewCta": "Go to my account",
   "pay.title": "Complete payment", "pay.subtitle": "Scan the QR with a bank app, or tap your bank below.",
   "pay.amount": "Amount", "pay.scanHint": "Open QPay or a bank app and scan this code.",
@@ -332,7 +333,8 @@ const mn: Dict = {
   "shop.titlePre": "", "shop.titleAccent": "Бүтээгдэхүүнүүд",
   // processing
   "proc.missingRef": "Төлбөрийн лавлагаа алга", "proc.verifyFailed": "Төлбөр баталгаажуулж чадсангүй",
-  "proc.timeout": "Төлбөр хүлээгдсэнээс удаж байна.", "proc.pendingTitle": "Төлбөр хүлээгдэж байна",
+  "pay.window": "Төлбөрөө 30 минутын дотор төлөөрэй — энэ хуудас автоматаар баталгаажна.",
+  "proc.timeout": "30 минутын төлбөрийн хугацаа дууслаа. Сагс руугаа буцаж дахин оролдоно уу.", "proc.pendingTitle": "Төлбөр хүлээгдэж байна",
   "proc.reviewTitle": "Төлбөр хүлээн авлаа", "proc.reviewDesc": "Таны төлбөрийг хүлээн авч, захиалгыг баталгаажуулж байна. Манай баг удахгүй имэйлээр холбогдоно — танаас давхар төлбөр аваагүй болно.", "proc.reviewCta": "Миний бүртгэл рүү",
   "pay.title": "Төлбөр төлөх", "pay.subtitle": "QR кодыг банкны аппаараа уншуулах, эсвэл доороос банкаа сонгоно уу.",
   "pay.amount": "Төлөх дүн", "pay.scanHint": "QPay эсвэл банкны аппаа нээж энэ кодыг уншуулна уу.",

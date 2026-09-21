@@ -31,7 +31,13 @@ const nextConfig = {
   images: {
     // Serve modern formats + responsive sizes; product images are local (public/)
     // in dev and move to R2/CDN in prod (remotePatterns above).
-    formats: ["image/avif", "image/webp"],
+    // WebP only: AVIF encodes several times slower, and on this small container
+    // the first visitor to a new image would wait for it.
+    formats: ["image/webp"],
+    // Uploaded files get unique names, so optimized variants can be kept long.
+    minimumCacheTTL: 60 * 60 * 24 * 31,
+    // No 3840px variants — the widest layout is ~1280 CSS px (2560 on retina).
+    deviceSizes: [640, 750, 828, 1080, 1280, 1600, 2048, 2560],
     remotePatterns,
   },
   async rewrites() {

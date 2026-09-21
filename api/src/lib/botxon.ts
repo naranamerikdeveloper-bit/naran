@@ -60,10 +60,28 @@ export async function createInvoice(opts: {
     mockInv.set(invoiceId, { amount: opts.amount, orderRef: opts.orderRef, created: Date.now() });
     return { invoiceId, qrText: "0002010102...mockQPay", qrImage: "", shortUrl: "", urls: [] };
   }
-  return gwFetch<BotxonInvoice>("/api/gateway/v1/invoices", {
+  const raw = await gwFetch<Json>("/api/gateway/v1/invoices", {
     method: "POST",
     json: { amount: opts.amount, description: opts.description, orderRef: opts.orderRef, customerRef: opts.customerRef },
   });
+  // The gateway's field names aren't pinned down (camelCase vs snake_case, id vs
+  // invoiceId, optionally wrapped in { data }). A missing id made every status
+  // check hit /invoices/undefined → 404, so normalize and refuse to continue
+  // without one.
+  const d: Json = raw?.data && typeof raw.data === "object" && !Array.isArray(raw.data) ? raw.data : raw;
+  const invoiceId = String(d.invoiceId ?? d.invoice_id ?? d.id ?? d.invoice?.id ?? "");
+  if (!invoiceId) {
+    console.error("[botxon] create response without an invoice id; keys:", Object.keys(d || {}).join(","));
+    throw new Error("Botxon returned no invoice id");
+  }
+  console.log(`[botxon] invoice ${invoiceId} created (fields: ${Object.keys(d).join(",")})`);
+  return {
+    invoiceId,
+    qrText: d.qrText ?? d.qr_text ?? "",
+    qrImage: d.qrImage ?? d.qr_image ?? "",
+    shortUrl: d.shortUrl ?? d.short_url ?? "",
+    urls: d.urls ?? d.deeplinks ?? [],
+  };
 }
 
 // 2) Authoritative status check. This is the source of truth: even after a
@@ -73,7 +91,16 @@ export async function getInvoice(invoiceId: string): Promise<BotxonStatus> {
     const rec = mockInv.get(invoiceId);
     return { status: mockStatus(invoiceId), amount: rec?.amount ?? 0, orderRef: rec?.orderRef ?? "" };
   }
-  return gwFetch<BotxonStatus>(`/api/gateway/v1/invoices/${encodeURIComponent(invoiceId)}`, { method: "GET" });
+  const raw = await gwFetch<Json>(`/api/gateway/v1/invoices/${encodeURIComponent(invoiceId)}`, { method: "GET" });
+  const d: Json = raw?.data && typeof raw.data === "object" && !Array.isArray(raw.data) ? raw.data : raw;
+  const st = String(d.status ?? d.state ?? "pending").toLowerCase();
+  return {
+    status: st === "paid" || st === "success" || st === "succeeded" ? "paid"
+      : st === "failed" || st === "cancelled" || st === "canceled" || st === "expired" ? "failed" : "pending",
+    amount: Number(d.amount ?? 0),
+    orderRef: d.orderRef ?? d.order_ref ?? "",
+    paidAt: d.paidAt ?? d.paid_at ?? null,
+  };
 }
 
 // 3) Verify a Botxon webhook signature: header `X-Botxon-Signature: sha256=<hex>`

@@ -35,10 +35,10 @@ export function generateStaticParams() {
 // headings use Onest — the closest geometric face with full Cyrillic incl. Ү/Ө
 // (U+04AE/U+04E8, cyrillic-ext). The CSS stack is Outfit → Onest, so each script
 // gets a matching glyph instead of falling back to a system font.
-const outfit = Outfit({ subsets: ["latin", "latin-ext"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
-const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-onest", display: "swap" });
+const outfit = Outfit({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
+const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["400", "500", "600", "700", "800"], variable: "--font-onest", display: "swap" });
 // Body: Inter, with cyrillic-ext for Ү/Ө.
-const inter = Inter({ subsets: ["latin", "cyrillic", "cyrillic-ext"], weight: ["300", "400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
+const inter = Inter({ subsets: ["latin", "cyrillic", "cyrillic-ext"], weight: ["400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains", display: "swap" });
 
 export default function LangLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {

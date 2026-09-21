@@ -150,7 +150,7 @@ export default async function ShopPage({
             </Reveal>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mt-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 gap-y-8 sm:gap-x-5 sm:gap-y-11 lg:gap-x-6 lg:gap-y-12 mt-6">
                 {products.map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
               </div>
               <Pager sp={searchParams} page={page} pages={pages}/>

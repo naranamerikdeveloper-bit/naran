@@ -241,6 +241,15 @@ function categoryIds(): Promise<Record<string, string>> {
   return _catIds;
 }
 
+// Card / quick-view subset of a product (see list()).
+const slimForList = (p: Product): Product => ({
+  ...p,
+  description: p.description.length > 240 ? p.description.slice(0, 237).trimEnd() + "…" : p.description,
+  bullets: [],
+  specs: {},
+  images: p.image ? [p.image] : [],
+});
+
 export const medusa = {
   products: {
     list: async (params: Record<string, string | undefined> = {}): Promise<ListResult> => {
@@ -285,7 +294,9 @@ export const medusa = {
       }
 
       return {
-        data: list,
+        // Listings only need what a card / quick view shows — dropping the long
+        // copy, specs and extra gallery images keeps the page payload small.
+        data: list.map(slimForList),
         total: list.length,
         facets: {
           categories: tally(except(byCat), p => p.category),
