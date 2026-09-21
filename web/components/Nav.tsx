@@ -43,6 +43,13 @@ export function Nav() {
   const openCart = useUI(s => s.openCart);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 12);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   const count = mounted ? items.reduce((a, b) => a + b.qty, 0) : 0;
   const wishCount = mounted ? wishIds.length : 0;
   const t = useT();
@@ -89,7 +96,8 @@ export function Nav() {
   );
 
   return (
-    <>
+    // Sticky: stays pinned while scrolling; firms up (more opaque, deeper shadow) once the page moves.
+    <header className={`sticky top-2 sm:top-3 lg:top-4 z-50 transition-all duration-300 ease-elegant before:content-[""] before:absolute before:-inset-x-3 before:-top-2 before:-bottom-2 before:-z-10 before:bg-white/85 before:backdrop-blur-xl before:shadow-[0_8px_24px_-18px_rgba(10,10,11,.35)] before:opacity-0 before:transition-opacity before:duration-300 lg:before:hidden ${scrolled ? "max-lg:before:opacity-100 [&_nav]:bg-white/90 [&_nav]:shadow-[0_14px_40px_-18px_rgba(10,10,11,.32)]" : ""}`}>
       {/* ---------- Mobile bar ---------- */}
       <div className="lg:hidden flex items-center gap-2.5">
         <Link href="/" aria-label="NARAN" className="shrink-0 -ml-0.5"><Logo priority className="h-10"/></Link>
@@ -137,6 +145,6 @@ export function Nav() {
           </Link>
         </div>
       </nav>
-    </>
+    </header>
   );
 }
