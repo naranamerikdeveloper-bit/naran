@@ -31,11 +31,44 @@ export function generateMetadata({ params }: { params: { lang: Lang } }): Metada
 }
 
 const cats = ["all", "Fragrance", "Skincare", "Makeup", "Body", "Gift"];
+const PAGE_SIZE = 48;
+
+type ShopParams = { category?: string; sort?: string; q?: string; gender?: string; filter?: string; color?: string; tech?: string; minPrice?: string; maxPrice?: string; page?: string };
+
+// Page links keep every active filter and only swap `page`.
+function pageHref(sp: ShopParams, page: number) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) if (v && k !== "page") q.set(k, v);
+  if (page > 1) q.set("page", String(page));
+  const s = q.toString();
+  return s ? `/shop?${s}` : "/shop";
+}
+
+function Pager({ sp, page, pages }: { sp: ShopParams; page: number; pages: number }) {
+  if (pages <= 1) return null;
+  // First, last, and a window around the current page; gaps become "…".
+  const nums = Array.from(new Set([1, pages, page - 1, page, page + 1].filter(n => n >= 1 && n <= pages))).sort((a, b) => a - b);
+  const cell = "h-10 min-w-10 px-3 rounded-pill inline-flex items-center justify-center text-[14px] num-tabular transition";
+  return (
+    <nav aria-label="Хуудаслалт" className="flex items-center justify-center gap-1.5 mt-10 flex-wrap">
+      {page > 1 && <Link href={pageHref(sp, page - 1)} className={`${cell} border border-line bg-white hover:border-ink`} aria-label="Өмнөх">‹</Link>}
+      {nums.map((n, i) => (
+        <span key={n} className="contents">
+          {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-subtle">…</span>}
+          {n === page
+            ? <span aria-current="page" className={`${cell} bg-ink text-white`}>{n}</span>
+            : <Link href={pageHref(sp, n)} className={`${cell} border border-line bg-white hover:border-ink`}>{n}</Link>}
+        </span>
+      ))}
+      {page < pages && <Link href={pageHref(sp, page + 1)} className={`${cell} border border-line bg-white hover:border-ink`} aria-label="Дараах">›</Link>}
+    </nav>
+  );
+}
 
 export default async function ShopPage({
   params,
   searchParams,
-}: { params: { lang: Lang }; searchParams: { category?: string; sort?: string; q?: string; gender?: string; filter?: string; color?: string; tech?: string; minPrice?: string; maxPrice?: string } }) {
+}: { params: { lang: Lang }; searchParams: ShopParams }) {
   const t = tFor(params.lang);
   // Resilient: a catalog outage degrades to the empty state, never a 500.
   const [listRes, allForColors] = await Promise.all([
@@ -52,7 +85,10 @@ export default async function ShopPage({
     }).catch(() => ({ data: [] as Product[], total: 0 })),
     api.products.list({}).catch(() => ({ data: [] as Product[] })),
   ]);
-  const { data: products, total } = listRes;
+  const { data: all, total } = listRes;
+  const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Math.floor(Number(searchParams.page)) || 1));
+  const products = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   // Real swatches: unique product accents, so every colour chip yields results.
   const availableColors = Array.from(new Set(allForColors.data.map(p => p.accent)));
 
@@ -115,6 +151,7 @@ export default async function ShopPage({
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mt-6">
                 {products.map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
               </div>
+              <Pager sp={searchParams} page={page} pages={pages}/>
             </>
           )}
         </div>

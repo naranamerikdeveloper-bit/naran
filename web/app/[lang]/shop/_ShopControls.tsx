@@ -15,6 +15,7 @@ function useSetParams() {
   const sp = useSearchParams();
   return (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(sp.toString());
+    next.delete("page"); // any filter/sort change restarts at page 1
     for (const [k, v] of Object.entries(updates)) {
       if (v === null || v === "") next.delete(k);
       else next.set(k, v);

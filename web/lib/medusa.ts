@@ -177,6 +177,20 @@ async function fetchProducts(opts: { q?: string; limit?: number; offset?: number
 }
 const fetchAll = async (): Promise<Product[]> => (await fetchProducts()).products;
 
+// Browse needs the WHOLE (category-filtered) catalog: sorting by price and the
+// gender/colour/price filters run on the result, and the shop page paginates
+// it. Medusa caps a page at 100, so fetch every page (in parallel, fetch-
+// cached for BROWSE_REVALIDATE). Capped so a runaway catalog can't stall SSR.
+const BROWSE_CAP = 3000;
+async function fetchCatalog(categoryId?: string): Promise<Product[]> {
+  const first = await fetchProducts({ categoryId, limit: 100, offset: 0, revalidate: BROWSE_REVALIDATE });
+  const offsets: number[] = [];
+  for (let off = 100; off < Math.min(first.total, BROWSE_CAP); off += 100) offsets.push(off);
+  const rest = await Promise.all(offsets.map(offset =>
+    fetchProducts({ categoryId, limit: 100, offset, revalidate: BROWSE_REVALIDATE }).then(r => r.products)));
+  return first.products.concat(...rest);
+}
+
 // Free-text search. Prefers MeiliSearch (typo-tolerant) via the plugin's store
 // endpoint, which hydrates full products (with prices). Any failure — or Meili
 // disabled — falls back to Medusa's built-in `q` search so search never breaks.
@@ -222,7 +236,7 @@ export const medusa = {
       } else {
         // Browse: category resolves to a Medusa id → filtered server-side (scales to 10k+).
         const categoryId = wantCat ? (await categoryIds())[wantCat] : undefined;
-        list = (await fetchProducts({ categoryId, revalidate: BROWSE_REVALIDATE })).products;
+        list = await fetchCatalog(categoryId);
         if (wantCat && !categoryId) list = list.filter(p => p.category === wantCat);
       }
       // A gender page also shows Unisex pieces.
