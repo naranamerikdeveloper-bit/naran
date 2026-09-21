@@ -177,7 +177,8 @@ html.lenis, html.lenis body { height: auto; }
   .field input, .field select {
     @apply h-12 w-full px-4 rounded-xl border border-line bg-surface-2 outline-none transition;
   }
-  .field input:focus, .field select:focus { @apply border-ink bg-white ring-4 ring-black/5; }
+  .field textarea { @apply w-full px-4 py-3 rounded-xl border border-line bg-surface-2 outline-none transition leading-relaxed; }
+  .field input:focus, .field select:focus, .field textarea:focus { @apply border-ink bg-white ring-4 ring-black/5; }
 
   .glass {
     background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.4));

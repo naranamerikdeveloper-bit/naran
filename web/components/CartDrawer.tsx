@@ -3,6 +3,7 @@ import { LocaleLink as Link } from "@/components/LocaleLink";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCart, useUI } from "@/lib/store";
+import { useDelivery } from "@/lib/useDelivery";
 import { useT } from "./LangProvider";
 import { money } from "@/lib/api";
 import { Photo } from "./Photo";
@@ -19,11 +20,8 @@ export function CartDrawer() {
   const remove = useCart(s => s.remove);
   const t = useT();
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
-  // Free-shipping incentive (mirrors checkout + the ₮150,000 backend promo).
-  const FREE_SHIP_THRESHOLD = 150000;
-  const freeShip = subtotal >= FREE_SHIP_THRESHOLD;
-  const freeShipRemaining = Math.max(0, FREE_SHIP_THRESHOLD - subtotal);
-  const freeShipPct = Math.min(100, Math.round((subtotal / FREE_SHIP_THRESHOLD) * 100));
+  // One delivery fee for every order, set in the admin (0 = free).
+  const delivery = useDelivery();
   const closeRef = useRef<HTMLButtonElement>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,16 +114,10 @@ export function CartDrawer() {
                     })}
                 </div>
                 <footer className="border-t border-line p-4 shrink-0">
-                  {/* Free-shipping progress — motivates toward the threshold */}
-                  {freeShip ? (
-                    <div className="text-[12px] text-green-600 mb-3 flex items-center gap-1.5"><span className="text-[13px]">✓</span> {t("cart.freeUnlocked")}</div>
-                  ) : (
-                    <div className="mb-3">
-                      <div className="text-[12px] text-muted mb-1.5">{t("co.freeShipHintPre")} <b className="text-ink num-tabular">{money(freeShipRemaining)}</b> {t("co.freeShipHintPost")}</div>
-                      <div className="h-1.5 rounded-pill bg-surface-2 overflow-hidden">
-                        <motion.div className="h-full rounded-pill bg-gradient-to-r from-accent to-accent-deep"
-                          initial={false} animate={{ width: `${freeShipPct}%` }} transition={{ duration: 0.6, ease: [0.22, 0.61, 0.36, 1] }}/>
-                      </div>
+                  {delivery && (
+                    <div className="text-[12px] text-muted mb-3 flex items-center justify-between">
+                      <span>{delivery.fee === 0 ? t("cart.freeDelivery") : t("cart.deliveryFee")}</span>
+                      {delivery.fee === 0 ? <span className="text-accent-deep font-semibold">✓</span> : <b className="text-ink num-tabular">{money(delivery.fee)}</b>}
                     </div>
                   )}
                   <div className="flex justify-between font-display text-[18px] mb-3">

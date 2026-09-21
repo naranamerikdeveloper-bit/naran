@@ -409,6 +409,12 @@ export const medusa = {
 
   // Real shipping options for the given items, priced by Medusa (single source
   // of truth — the checkout renders these instead of hardcoded methods/prices).
+  // The single delivery option + fee the admin configured (0 = free).
+  delivery: async (): Promise<{ optionId: string | null; fee: number }> => {
+    const d = await mfetch("delivery");
+    return { optionId: d.option_id ?? null, fee: Math.round(d.fee ?? 0) };
+  },
+
   shippingQuote: async (items: { variantId: string; quantity: number }[]): Promise<{ id: string; name: string; amount: number }[]> => {
     const { cart } = await mpost("carts", {
       region_id: REGION,
@@ -426,7 +432,7 @@ export const medusa = {
     email: string;
     items: { variantId: string; quantity: number }[];
     shippingMethod?: "standard" | "express";
-    address: { first_name: string; last_name: string; address_1: string; city: string; postal_code: string; country_code: string; phone?: string };
+    address: { first_name: string; last_name: string; address_1: string; address_2?: string; city: string; postal_code?: string; country_code: string; phone?: string; metadata?: Record<string, string> };
     token?: string; // logged-in customer → link the order to their account
     promoCode?: string; // optional coupon applied before payment
     shippingOptionId?: string; // explicit option (from the dynamic quote)
@@ -442,10 +448,9 @@ export const medusa = {
       billing_address: input.address,
     }, input.token);
     const { shipping_options } = await mfetch(`shipping-options?cart_id=${cart.id}`);
-    const wantExpress = input.shippingMethod === "express";
-    const opt = (input.shippingOptionId && shipping_options.find((o: any) => o.id === input.shippingOptionId))
-      || shipping_options.find((o: any) => (wantExpress ? /express/i : /standard/i).test(o.name))
-      || shipping_options[0];
+    // The admin-configured delivery option is the only one used (no customer choice).
+    const wantId = input.shippingOptionId || (await medusa.delivery().catch(() => ({ optionId: null }))).optionId;
+    const opt = (wantId && shipping_options.find((o: any) => o.id === wantId)) || shipping_options[0];
     if (!opt) throw new Error("No shipping option available");
     await mpost(`carts/${cart.id}/shipping-methods`, { option_id: opt.id });
     // Apply coupon after shipping so both item- and shipping-target promos compute.
@@ -473,14 +478,12 @@ export const medusa = {
     });
     // Minimal MN address + shipping method so FREESHIP-style promos can compute.
     await mpost(`carts/${cart.id}`, {
-      shipping_address: { first_name: "Preview", last_name: "", address_1: "-", city: "Ulaanbaatar", postal_code: "14200", country_code: "mn" },
+      shipping_address: { first_name: "Preview", last_name: "", address_1: "-", city: "Ulaanbaatar", country_code: "mn" },
     });
     try {
       const { shipping_options } = await mfetch(`shipping-options?cart_id=${cart.id}`);
-      const wantExpress = input.shippingMethod === "express";
-      const opt = (input.shippingOptionId && shipping_options.find((o: any) => o.id === input.shippingOptionId))
-        || shipping_options.find((o: any) => (wantExpress ? /express/i : /standard/i).test(o.name))
-        || shipping_options[0];
+      const wantId = input.shippingOptionId || (await medusa.delivery().catch(() => ({ optionId: null }))).optionId;
+      const opt = (wantId && shipping_options.find((o: any) => o.id === wantId)) || shipping_options[0];
       if (opt) await mpost(`carts/${cart.id}/shipping-methods`, { option_id: opt.id });
     } catch { /* shipping optional for preview */ }
     const res = await mpost(`carts/${cart.id}/promotions`, { promo_codes: [code] });

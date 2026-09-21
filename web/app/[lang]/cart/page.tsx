@@ -7,6 +7,7 @@ import { ProductVisual } from "@/components/ProductVisual";
 import { Photo } from "@/components/Photo";
 import { ArrowRight, TrashIcon, CheckIcon } from "@/components/Icons";
 import { useCart } from "@/lib/store";
+import { useDelivery } from "@/lib/useDelivery";
 import { useT } from "@/components/LangProvider";
 import { Skeleton } from "@/components/Skeleton";
 import { money } from "@/lib/api";
@@ -22,15 +23,10 @@ export default function CartPage() {
 
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   const tax = 0;
-  // Free shipping only kicks in over the threshold (mirrors the backend promo and
-  // the checkout summary). Below it, the exact fee is priced by Medusa at
-  // checkout — so we say "calculated at checkout" here rather than a false "Free"
-  // that then jumps up on the next page (H3). Keep in sync with checkout page.
-  const FREE_SHIP_THRESHOLD = 150000;
-  const freeShip = subtotal >= FREE_SHIP_THRESHOLD;
-  const freeShipRemaining = Math.max(0, FREE_SHIP_THRESHOLD - subtotal);
-  const freeShipPct = Math.min(100, Math.round((subtotal / FREE_SHIP_THRESHOLD) * 100));
-  const total = subtotal + tax; // merchandise total; shipping added at checkout when not free
+  // One delivery fee for every order, set in the admin (0 = free).
+  const delivery = useDelivery();
+  const shipping = delivery?.fee ?? 0;
+  const total = subtotal + tax + shipping;
 
   return (
     <>
@@ -100,7 +96,7 @@ export default function CartPage() {
               <h3 className="font-display text-[20px] tracking-tight">{t("cart.summary")}</h3>
               <div className="mt-4">
                 <Row k={t("cart.subtotal")} v={money(subtotal)}/>
-                <Row k={t("cart.shipping")} v={freeShip ? t("common.free") : t("cart.shipAtCheckout")}/>
+                <Row k={t("cart.shipping")} v={!delivery ? "…" : shipping === 0 ? t("common.free") : money(shipping)}/>
                 <Row k={t("cart.tax")} v={money(tax)}/>
               </div>
               <div className="flex justify-between border-t border-line mt-4 pt-4 font-display text-[20px]">
@@ -109,20 +105,11 @@ export default function CartPage() {
               <Link href="/checkout" className={`btn btn-primary w-full justify-center mt-4 ${items.length === 0 ? "pointer-events-none opacity-50" : ""}`}>
                 {t("cart.checkout")} <span className="arrow-cap !bg-white !text-ink"><ArrowRight width={14} height={14}/></span>
               </Link>
-              {mounted && (freeShip ? (
-                <div className="mt-4 p-3 rounded-xl bg-green-50 border border-green-200 text-[12px] text-green-700 text-center font-medium flex items-center justify-center gap-1.5">
-                  <CheckIcon width={13} height={13}/> {t("cart.freeUnlocked")}
+              {mounted && delivery?.fee === 0 && (
+                <div className="mt-4 p-3 rounded-xl bg-accent-soft/60 text-[12.5px] text-accent-deep text-center font-medium flex items-center justify-center gap-1.5">
+                  <CheckIcon width={13} height={13}/> {t("cart.freeDelivery")}
                 </div>
-              ) : (
-                <div className="mt-4 p-3 rounded-xl bg-accent-soft/60">
-                  <div className="text-[12px] text-accent-deep mb-1.5 text-center">
-                    {t("co.freeShipHintPre")} <b className="num-tabular">{money(freeShipRemaining)}</b> {t("co.freeShipHintPost")}
-                  </div>
-                  <div className="h-1.5 rounded-pill bg-white/70 overflow-hidden" role="progressbar" aria-valuenow={freeShipPct} aria-valuemin={0} aria-valuemax={100}>
-                    <div className="h-full rounded-pill bg-gradient-to-r from-accent to-accent-deep transition-[width] duration-700 ease-elegant" style={{ width: `${freeShipPct}%` }}/>
-                  </div>
-                </div>
-              ))}
+              )}
             </aside>
           </div>
         </div>

@@ -10,6 +10,7 @@ import { useT, useLang } from "@/components/LangProvider";
 import { money } from "@/lib/api";
 import { medusa } from "@/lib/medusa";
 import { botxon } from "@/lib/botxon";
+import { useDelivery } from "@/lib/useDelivery";
 
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
@@ -23,9 +24,9 @@ export default function CheckoutPage() {
   const user = useAuth(s => s.user);
   const token = useAuth(s => s.token);
   const [email, setEmail] = useState("");
-  // Shipping options come from Medusa (single source of truth — no hardcoded prices).
-  const [shipOptions, setShipOptions] = useState<{ id: string; name: string; amount: number }[]>([]);
-  const [shipOptionId, setShipOptionId] = useState<string>("");
+  // One delivery fee for every order, set in the admin (0 = free) — no choice here.
+  const delivery = useDelivery();
+  const shipOptionId = delivery?.optionId || "";
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
@@ -41,29 +42,11 @@ export default function CheckoutPage() {
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   const lineItemsFor = () => items.filter(i => i.variantId).map(i => ({ variantId: i.variantId!, quantity: i.qty }));
 
-  // Fetch real, priced shipping options once the cart items are known.
-  useEffect(() => {
-    const li = lineItemsFor();
-    if (!mounted || li.length === 0 || shipOptions.length) return;
-    let cancelled = false;
-    medusa.shippingQuote(li)
-      .then(opts => { if (!cancelled && opts.length) { setShipOptions(opts); setShipOptionId(id => id || opts[0].id); } })
-      .catch(() => {});
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, items]);
-
-  const selectedShip = shipOptions.find(o => o.id === shipOptionId);
-  // Automatic free shipping over the threshold (mirrors the backend promo so the
-  // summary matches the charge). Keep in sync with seed-free-shipping.ts.
-  const FREE_SHIP_THRESHOLD = 150000;
-  const freeByThreshold = subtotal >= FREE_SHIP_THRESHOLD;
-  const shipping = freeByThreshold ? 0 : (selectedShip ? selectedShip.amount : 0);
+  const shipping = delivery?.fee ?? 0;
   const tax = 0;
   // Effective totals — Medusa's numbers when a coupon is applied, else local.
   const discount = promo ? promo.discountTotal : 0;
   const total = promo ? promo.total : subtotal + shipping + tax;
-  const freeShipRemaining = Math.max(0, FREE_SHIP_THRESHOLD - subtotal);
 
   async function applyPromo(code: string) {
     const c = code.trim();
@@ -96,7 +79,7 @@ export default function CheckoutPage() {
   function validate(fd: FormData): boolean {
     const er: Record<string, string> = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) er.email = t("auth.invalidEmail");
-    for (const f of ["first_name", "last_name", "address_1", "city", "postal_code"]) {
+    for (const f of ["first_name", "last_name", "address_1", "city"]) {
       if (!String(fd.get(f) || "").trim()) er[f] = t("common.required");
     }
     const phone = String(fd.get("phone") || "").trim();
@@ -124,16 +107,18 @@ export default function CheckoutPage() {
       first_name: String(fd.get("first_name") || "Customer"),
       last_name: String(fd.get("last_name") || ""),
       address_1: String(fd.get("address_1") || ""),
+      // Apartment / entrance details and courier notes (no postal codes in MN delivery).
+      address_2: String(fd.get("address_2") || "").trim(),
       city: String(fd.get("city") || ""),
-      postal_code: String(fd.get("postal_code") || ""),
       country_code: "mn",
       phone: String(fd.get("phone") || ""),
+      metadata: { entrance_code: String(fd.get("entrance_code") || "").trim() },
     };
 
     setBusy(true);
     try {
       // Coarse method label for the payment intent (metadata only).
-      const coarse: "standard" | "express" = /express/i.test(selectedShip?.name || "") ? "express" : "standard";
+      const coarse = "standard" as const;
       // 1. Build the Medusa cart (not completed yet)
       const { cartId, total: cartTotal } = await medusa.prepareCart({ email, items: lineItems, shippingOptionId: shipOptionId || undefined, address, token: token ?? undefined, promoCode: promoCode ?? undefined });
       // 2. Create a Botxon invoice (QPay / bank apps) — money to the merchant's QPay.
@@ -191,30 +176,16 @@ export default function CheckoutPage() {
                 <Field label={t("co.lastName")} required error={errors.last_name}><input name="last_name" placeholder="Эрдэнэ" aria-invalid={!!errors.last_name}/></Field>
                 <Field label={t("co.address")} full required error={errors.address_1}><input name="address_1" placeholder={t("co.addressPh")} aria-invalid={!!errors.address_1}/></Field>
                 <Field label={t("co.city")} required error={errors.city}><input name="city" placeholder="Улаанбаатар" aria-invalid={!!errors.city}/></Field>
-                <Field label={t("co.postal")} required error={errors.postal_code}><input name="postal_code" placeholder="14200" aria-invalid={!!errors.postal_code}/></Field>
+                <Field label={t("co.entrance")}><input name="entrance_code" placeholder={t("co.entrancePh")} autoComplete="off"/></Field>
                 <Field label={t("co.country")}>
                   <select name="country"><option value="mn">{t("co.mongolia")}</option></select>
                 </Field>
                 <Field label={t("co.phone")} required error={errors.phone}><input name="phone" type="tel" inputMode="tel" placeholder="+976 …" aria-invalid={!!errors.phone}/></Field>
+                <Field label={t("co.details")} full><textarea name="address_2" rows={3} placeholder={t("co.detailsPh")} className="resize-none"/></Field>
               </div>
             </FormCard>
 
-            <FormCard title={t("co.shippingMethod")} i={2}>
-              {shipOptions.length === 0 ? (
-                <div className="text-sm text-muted py-2">{t("common.pleaseWait")}</div>
-              ) : shipOptions.map(o => {
-                const isExpress = /express/i.test(o.name);
-                const isStandard = /standard/i.test(o.name);
-                const title = isExpress ? t("co.express") : isStandard ? t("co.standard") : o.name;
-                const sub = isExpress ? t("co.expressSub") : isStandard ? t("co.standardSub") : undefined;
-                return (
-                  <Radio key={o.id} name="ship" checked={shipOptionId === o.id} onChange={() => setShipOptionId(o.id)}
-                    title={title} sub={sub} right={o.amount === 0 ? t("common.free") : money(o.amount)}/>
-                );
-              })}
-            </FormCard>
-
-            <FormCard title={t("co.payment")} i={3}>
+            <FormCard title={t("co.payment")} i={2}>
               <div className="border-2 border-ink rounded-xl p-4 flex items-center gap-3.5 bg-surface-2">
                 <input type="radio" name="pay" checked readOnly className="sr-only"/>
                 <span className="shrink-0 w-5 h-5 rounded-full grid place-items-center border-2 border-accent-deep bg-accent-deep" aria-hidden>
@@ -293,17 +264,6 @@ export default function CheckoutPage() {
             <Row k={t("cart.subtotal")} v={money(subtotal)}/>
             {discount > 0 && <Row k={t("co.discount")} v={`− ${money(discount)}`}/>}
             <Row k={t("cart.shipping")} v={shipping === 0 ? t("common.free") : money(shipping)}/>
-            {mounted && !promo && (freeByThreshold ? (
-              <div className="text-[12px] text-green-600 -mt-1 mb-2 flex items-center gap-1.5"><CheckIcon width={13} height={13}/> {t("co.freeShipEarned")}</div>
-            ) : freeShipRemaining > 0 && (
-              <div className="-mt-1 mb-2.5">
-                <div className="text-[12px] text-muted mb-1.5">{t("co.freeShipHintPre")} <b className="text-ink num-tabular">{money(freeShipRemaining)}</b> {t("co.freeShipHintPost")}</div>
-                <div className="h-1.5 rounded-pill bg-surface-2 overflow-hidden">
-                  <div className="h-full rounded-pill bg-gradient-to-r from-accent to-accent-deep transition-[width] duration-700 ease-elegant"
-                    style={{ width: `${Math.min(100, Math.round((subtotal / FREE_SHIP_THRESHOLD) * 100))}%` }}/>
-                </div>
-              </div>
-            ))}
             <Row k={t("cart.tax")} v={money(tax)}/>
             <div className="flex justify-between border-t border-border pt-4.5 mt-3 text-[18px] font-semibold">
               <span>{t("cart.total")}</span>

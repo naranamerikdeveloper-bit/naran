@@ -215,6 +215,8 @@ services:
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
         # R2 image host → next/image remotePatterns (baked in at build time).
         S3_FILE_URL: ${S3_FILE_URL:-}
+        # /api/* rewrite target — frozen into the build, must be the internal gateway.
+        API_URL: http://api:4000
     <<: *restart
     depends_on:
       medusa: { condition: service_started }

@@ -25,7 +25,12 @@ ARG NEXT_PUBLIC_SENTRY_DSN
 # which is frozen into the standalone build — without it at BUILD time every R2
 # image is rejected by /_next/image ("url" parameter is not allowed).
 ARG S3_FILE_URL
+# Express gateway for the /api/* rewrite. Rewrites are frozen into the build
+# (routes-manifest), so without this at BUILD time /api/* points at
+# localhost:4000 and every payment call 500s in production.
+ARG API_URL=http://api:4000
 ENV S3_FILE_URL=$S3_FILE_URL \
+    API_URL=$API_URL \
     NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
     NEXT_PUBLIC_MEDUSA_URL=$NEXT_PUBLIC_MEDUSA_URL \
     NEXT_PUBLIC_MEDUSA_PK=$NEXT_PUBLIC_MEDUSA_PK \

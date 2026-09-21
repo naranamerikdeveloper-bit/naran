@@ -80,6 +80,48 @@ function printPickPack(orders: QOrder[]) {
   w.document.write(html); w.document.close(); w.focus();
 }
 
+// Delivery fee (one fee for every order; 0 = free). Saved onto the storefront's
+// single shipping option, so checkout totals follow it immediately.
+function DeliveryFee({ canWrite }: { canWrite: boolean }) {
+  const [fee, setFee] = useState<number | null>(null);
+  const [input, setInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    adminFetch("/fulfillment/delivery").then(d => { setFee(d.fee); setInput(String(d.fee)); }).catch(() => setFee(null));
+  }, []);
+  const save = async (value: number) => {
+    setSaving(true);
+    try {
+      const d = await adminFetch("/fulfillment/delivery", { method: "POST", body: JSON.stringify({ fee: value }) });
+      setFee(d.fee); setInput(String(d.fee));
+      toast.success(d.fee === 0 ? "Хүргэлт үнэгүй боллоо" : `Хүргэлтийн төлбөр: ${nf(d.fee)}₮`);
+    } catch (e: any) { toast.error(e.message || "Хадгалж чадсангүй"); }
+    finally { setSaving(false); }
+  };
+  const parsed = Number(input.replace(/[^0-9]/g, ""));
+  return (
+    <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+      <div className="min-w-0 mr-auto">
+        <Text weight="plus" size="small">Хүргэлтийн төлбөр</Text>
+        <Text size="xsmall" className="text-ui-fg-subtle">
+          {fee === null ? "Ачаалж байна…" : fee === 0 ? "Одоогоор: үнэгүй хүргэлт" : `Одоогоор: захиалга бүрт ${nf(fee)}₮`}
+        </Text>
+      </div>
+      {canWrite && (
+        <>
+          <div className="flex items-center gap-1.5">
+            <Input size="small" inputMode="numeric" className="w-32" value={input}
+              onChange={e => setInput(e.target.value)} placeholder="0" aria-label="Хүргэлтийн төлбөр (₮)" />
+            <Text size="small" className="text-ui-fg-subtle">₮</Text>
+          </div>
+          <Button size="small" onClick={() => save(parsed)} isLoading={saving} disabled={saving || fee === null || parsed === fee}>Хадгалах</Button>
+          {fee !== 0 && <Button size="small" variant="secondary" onClick={() => save(0)} disabled={saving}>Үнэгүй болгох</Button>}
+        </>
+      )}
+    </div>
+  );
+}
+
 const FulfillmentPage = () => {
   const { loading: permLoading, can } = usePermissions();
   const [orders, setOrders] = useState<QOrder[]>([]);
@@ -172,6 +214,8 @@ const FulfillmentPage = () => {
         description="Шинэ захиалгыг биелүүлж, tracking-тэй илгээнэ. Түүвэрлэх/баглах жагсаалт хэвлэнэ."
         actions={<Button variant="secondary" size="small" onClick={load} disabled={loading}>Сэргээх</Button>}
       />
+
+      <DeliveryFee canWrite={canWrite} />
 
       {/* Summary + bulk actions */}
       <div className="flex flex-wrap items-center gap-3 px-6 py-3">

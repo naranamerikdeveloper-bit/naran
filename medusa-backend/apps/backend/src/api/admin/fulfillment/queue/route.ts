@@ -30,7 +30,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         "payment_collections.status",
         "items.id", "items.title", "items.product_title", "items.variant_sku", "items.quantity", "items.thumbnail",
         "shipping_address.first_name", "shipping_address.last_name",
-        "shipping_address.address_1", "shipping_address.city", "shipping_address.phone",
+        "shipping_address.address_1", "shipping_address.address_2", "shipping_address.city", "shipping_address.phone", "shipping_address.metadata",
         "fulfillments.id", "fulfillments.shipped_at", "fulfillments.delivered_at", "fulfillments.canceled_at",
       ],
       pagination: { take: PAGE, skip, order: { created_at: "DESC" } },
@@ -56,7 +56,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         paid,
         payment_status: payStatuses[0] || "—",
         customer: [a.first_name, a.last_name].filter(Boolean).join(" ") || o.email,
-        address: [a.address_1, a.city].filter(Boolean).join(", "),
+        // Street, city, entrance code and the customer's delivery notes (checkout fields).
+        address: [a.address_1, a.city, a.metadata?.entrance_code ? `Орц: ${a.metadata.entrance_code}` : "", a.address_2].filter(Boolean).join(", "),
         phone: a.phone || "",
         items: (o.items || []).map((i: any) => ({
           id: i.id,

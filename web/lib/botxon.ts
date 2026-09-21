@@ -19,6 +19,13 @@ export type BotxonStatus = {
   invoice: Omit<BotxonInvoice, "live"> | null;
 };
 
+// A proxy/gateway failure can return plain text ("Internal Server Error");
+// never surface a JSON parse error to the shopper.
+async function readJson(r: Response): Promise<any> {
+  const text = await r.text();
+  try { return JSON.parse(text); } catch { return { error: r.ok ? "Invalid response" : "Төлбөрийн систем түр ажиллахгүй байна. Хэсэг хугацааны дараа дахин оролдоно уу." }; }
+}
+
 export const botxon = {
   createInvoice: async (input: {
     cartId: string; amount: number; email: string;
@@ -29,14 +36,14 @@ export const botxon = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-    const d = await r.json();
+    const d = await readJson(r);
     // Prefer a human message (e.g. the out-of-stock notice) over the error code.
     if (!r.ok) throw new Error(d.message || d.error || "Payment could not be started");
     return d.data;
   },
   status: async (invoiceId: string): Promise<BotxonStatus> => {
     const r = await fetch(`/api/payments/botxon/invoice?id=${encodeURIComponent(invoiceId)}`, { cache: "no-store" });
-    const d = await r.json();
+    const d = await readJson(r);
     if (!r.ok) throw new Error(d.message || d.error || "Could not verify payment");
     return d.data;
   },
