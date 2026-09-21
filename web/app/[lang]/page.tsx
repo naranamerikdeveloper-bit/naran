@@ -159,22 +159,23 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
       <section className="py-16 lg:py-24">
         <div className="container">
           <Reveal blur>
-            <div className="relative overflow-hidden rounded-[2rem] bg-accent text-white grid grid-cols-1 lg:grid-cols-2 items-center min-h-[280px]">
-              <div className="absolute -right-20 -bottom-20 w-72 h-72 rounded-full bg-white/15 blur-2xl"/>
-              <div className="relative z-10 p-8 sm:p-12">
-                <span className="eyebrow text-white/80">{promo.kicker}</span>
-                <h2 className="hd-2 mt-3 text-white">{promo.title}</h2>
-                <p className="text-white/85 mt-3 max-w-[360px]">{promo.desc}</p>
-                <Link href={promo.href} className="btn btn-light mt-6">
+            {/* Editorial promo: the photo fills the card and melts into white on the
+                left (bottom on mobile); ink type, coral only as the small accent. */}
+            <div className="group relative isolate overflow-hidden rounded-[2rem] border border-line bg-[#FBF7F5] min-h-[440px] sm:min-h-[380px]">
+              <Photo src={promo.img} alt={promo.title} sizes="(max-width: 1024px) 100vw, 1280px"
+                fallback={<div className="absolute inset-0 bg-gradient-to-br from-accent-soft to-white"/>}
+                imgClassName="absolute inset-0 w-full h-full object-cover object-[70%_30%] transition-transform duration-[1400ms] ease-elegant group-hover:scale-[1.04]"/>
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/90 via-45% to-white/0 sm:bg-gradient-to-r sm:from-white sm:via-white/85 sm:via-40% sm:to-white/0 sm:to-75%"/>
+              <div className="relative z-10 flex flex-col justify-end sm:justify-center min-h-[inherit] p-7 sm:p-12 lg:p-14 max-w-[560px]">
+                <span className="inline-flex items-center gap-2 w-fit h-8 px-3.5 rounded-pill bg-white/80 backdrop-blur border border-accent/20 text-[11px] font-semibold uppercase tracking-[.2em] text-accent-deep">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent"/> {promo.kicker}
+                </span>
+                <h2 className="font-display text-[34px] sm:text-[46px] lg:text-[54px] leading-[1.02] tracking-tight text-ink mt-4">{promo.title}</h2>
+                {promo.desc && <p className="text-muted text-[15px] leading-relaxed mt-3 max-w-[400px]">{promo.desc}</p>}
+                <Link href={promo.href} className="btn mt-7 w-fit bg-ink text-white hover:bg-black hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-14px_rgba(10,10,11,.5)]">
                   {promo.cta}
                   <span className="arrow-cap"><ArrowUpRight width={14} height={14}/></span>
                 </Link>
-              </div>
-              <div className="relative h-[220px] lg:h-full min-h-[240px]">
-                <Photo src={promo.img} alt={promo.title}
-                  fallback={<div className="absolute inset-0"/>}
-                  imgClassName="absolute inset-0 w-full h-full object-cover"/>
-                <div className="absolute inset-0 bg-gradient-to-r from-accent via-accent/40 to-transparent lg:from-accent/80"/>
               </div>
             </div>
           </Reveal>
