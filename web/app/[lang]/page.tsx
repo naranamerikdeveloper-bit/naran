@@ -206,8 +206,8 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
         </div>
       </section>
 
-      {/* ===================== NEWSLETTER ===================== */}
-      <section className="pb-16 lg:pb-24">
+      {/* ===================== NEWSLETTER (tablet/desktop only — too heavy on phones) ===================== */}
+      <section className="hidden md:block pb-16 lg:pb-24">
         <div className="container">
           <Reveal blur
             className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(211,90,76,.35)]">

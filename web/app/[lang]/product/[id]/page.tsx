@@ -112,7 +112,7 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
             <span className="text-ink uppercase">{product.name}</span>
           </div>
 
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 mt-5">
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-12 mt-5">
             {/* Gallery */}
             <Gallery product={product} img={img}/>
 

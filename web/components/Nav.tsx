@@ -8,14 +8,7 @@ import { SearchIcon, BagIcon, UserIcon, HeartIcon } from "./Icons";
 import { useAuth, useCart, useWish, useUI } from "@/lib/store";
 import { useT, useLang } from "./LangProvider";
 import { LangToggle } from "./LangToggle";
-
-function Sliders({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>
-    </svg>
-  );
-}
+import { SearchBox } from "./SearchBox";
 
 // Small circular icon button that carries an animated count badge (shared by the
 // wishlist + cart controls).
@@ -55,8 +48,6 @@ export function Nav() {
   const t = useT();
   const lang = useLang();
 
-  const [q, setQ] = useState("");
-  useEffect(() => { setQ(new URLSearchParams(window.location.search).get("q") ?? ""); }, [pathname]);
 
   // Keyboard: Cmd/Ctrl+K or "/" focuses the visible search input.
   useEffect(() => {
@@ -74,11 +65,6 @@ export function Nav() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
-  function search(e: React.FormEvent) {
-    e.preventDefault();
-    const term = q.trim();
-    router.push(term ? `/${lang}/shop?q=${encodeURIComponent(term)}` : `/${lang}/shop`);
-  }
 
   const iconBtn = "relative w-11 h-11 rounded-full bg-white/70 border border-white/60 shadow-soft grid place-items-center text-ink hover:bg-white hover:-translate-y-px active:scale-90 transition-all duration-200 ease-elegant";
 
@@ -99,26 +85,30 @@ export function Nav() {
     // Sticky: stays pinned while scrolling; firms up (more opaque, deeper shadow) once the page moves.
     <header className={`sticky top-2 sm:top-3 lg:top-4 z-50 transition-all duration-300 ease-elegant before:content-[""] before:absolute before:-inset-x-3 before:-top-2 before:-bottom-2 before:-z-10 before:bg-white/85 before:backdrop-blur-xl before:shadow-[0_8px_24px_-18px_rgba(10,10,11,.35)] before:opacity-0 before:transition-opacity before:duration-300 lg:before:hidden ${scrolled ? "max-lg:before:opacity-100 [&_nav]:bg-white/90 [&_nav]:shadow-[0_14px_40px_-18px_rgba(10,10,11,.32)]" : ""}`}>
       {/* ---------- Mobile bar ---------- */}
-      <div className="lg:hidden flex items-center gap-2.5">
-        <Link href="/" aria-label="NARAN" className="shrink-0 -ml-0.5"><Logo priority className="h-10"/></Link>
-        <form onSubmit={search} className="flex-1 min-w-0 h-11 bg-white/70 border border-white/60 shadow-soft rounded-pill flex items-center gap-2.5 px-4 backdrop-blur focus-within:bg-white transition">
-          <button type="submit" className="text-subtle hover:text-ink shrink-0 active:scale-90 transition" aria-label={t("nav.search")}><SearchIcon width={16} height={16}/></button>
-          <input value={q} onChange={e => setQ(e.target.value)} aria-label={t("nav.search")} data-search-input
-            className="flex-1 bg-transparent outline-none text-[14px] placeholder:text-subtle min-w-0" placeholder={t("nav.searchShort")}/>
-          <Link href="/shop" className="text-subtle hover:text-ink shrink-0" aria-label={t("shop.filters")}><Sliders size={17}/></Link>
-        </form>
-        <LangToggle/>
-        {Wish}
-        {Bag}
+      <div className="lg:hidden">
+        <div className="flex items-center gap-2">
+          <Link href="/" aria-label="NARAN" className="shrink-0 -ml-0.5 mr-auto"><Logo priority className="h-10"/></Link>
+          <LangToggle/>
+          {Wish}
+          {Bag}
+        </div>
+        {/* Search on its own full-width row, separate from the shop filters. */}
+        <SearchBox className="mt-2.5" />
       </div>
 
       {/* ---------- Desktop bar — floating glass pill ----------
-          3-column grid (links · centered logo · controls) so the centered logo
-          always has reserved space and can never be overlapped by the side
-          content. Secondary links, search width and the account name scale down
-          between lg and xl so nothing ever collides at tighter widths. */}
-      <nav className="hidden lg:grid grid-cols-[auto_1fr_auto] items-center gap-3 xl:gap-4 bg-white/65 backdrop-blur-xl rounded-pill pl-5 xl:pl-6 pr-2 py-2.5 border border-white/60 ring-1 ring-black/[.04] shadow-[0_10px_34px_-16px_rgba(10,10,11,.28)]">
-        <div className="flex items-center gap-5 xl:gap-6 min-w-0">
+          3-column grid (logo · links · controls). The logo never shrinks; links
+          that do not fit drop out whole, and the search and account name scale
+          down between lg and xl so nothing collides at tighter widths (e.g. the
+          narrower checkout container). */}
+      <nav className="hidden lg:grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 xl:gap-8 bg-white/65 backdrop-blur-xl rounded-pill pl-4 xl:pl-5 pr-2 py-2 border border-white/60 ring-1 ring-black/[.04] shadow-[0_10px_34px_-16px_rgba(10,10,11,.28)]">
+        <Link href="/" aria-label="NARAN" className="shrink-0 flex items-center transition-transform duration-300 ease-spring hover:scale-[1.04]">
+          <Logo priority className="h-12 xl:h-[52px] -my-1 max-w-none shrink-0"/>
+        </Link>
+
+        {/* Links wrap onto a clipped second line when space runs out, so a link
+            either shows whole or not at all — never squeezes the logo. */}
+        <div className="flex flex-wrap items-start gap-x-5 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
           {[["/shop","nav.shop",true],["/shop?category=Fragrance","cat.Fragrance",false],["/shop?type=EDP","nav.edp",false],["/shop?type=EDT","nav.edt",false]].map(([h,k,pri]) => (
             <Link key={k as string} href={h as string}
               aria-current={pathname === h ? "page" : undefined}
@@ -126,16 +116,8 @@ export function Nav() {
           ))}
         </div>
 
-        <Link href="/" aria-label="NARAN" className="justify-self-center flex items-center transition-transform duration-300 ease-spring hover:scale-[1.04]">
-          <Logo priority className="h-12 xl:h-[52px] -my-2"/>
-        </Link>
-
         <div className="flex items-center gap-2 xl:gap-2.5 justify-self-end">
-          <form onSubmit={search} className="flex items-center gap-2.5 bg-surface-2 rounded-pill px-4 py-2.5 border border-transparent focus-within:border-line focus-within:bg-white transition-all duration-300 w-[150px] xl:w-[200px] focus-within:w-[210px] xl:focus-within:w-[260px]">
-            <button type="submit" className="text-subtle hover:text-ink shrink-0 active:scale-90 transition" aria-label={t("nav.search")}><SearchIcon width={16} height={16}/></button>
-            <input value={q} onChange={e => setQ(e.target.value)} aria-label={t("nav.search")} data-search-input
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-subtle min-w-0" placeholder={t("nav.searchShort")}/>
-          </form>
+          <SearchBox className="w-[200px] xl:w-[260px]" dropdownClassName="right-0 w-[400px]" />
           <LangToggle/>
           {Wish}
           {Bag}

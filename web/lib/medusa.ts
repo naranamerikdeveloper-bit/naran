@@ -409,6 +409,12 @@ export const medusa = {
 
   // Real shipping options for the given items, priced by Medusa (single source
   // of truth — the checkout renders these instead of hardcoded methods/prices).
+  // Live search suggestions for the header dropdown: visible products only.
+  suggest: async (q: string): Promise<{ items: Product[]; total: number }> => {
+    const all = (await searchProducts(q)).filter(p => !!p.image);
+    return { items: all.slice(0, 6), total: all.length };
+  },
+
   // The single delivery option + fee the admin configured (0 = free).
   delivery: async (): Promise<{ optionId: string | null; fee: number }> => {
     const d = await mfetch("delivery");

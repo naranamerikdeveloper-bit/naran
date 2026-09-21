@@ -12,7 +12,7 @@ export function Logo({ variant = "wordmark", className = "", priority = false }:
       width={452}
       height={full ? 330 : 256}
       priority={priority}
-      className={`w-auto select-none ${className}`}
+      className={`w-auto max-w-none select-none ${className}`}
     />
   );
 }

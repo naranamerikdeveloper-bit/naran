@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  /* Elegant high-contrast serif display (Playfair Display) with full Cyrillic;
-     Rubik carries the clean sans body (also Cyrillic). */
-  --font-display: var(--font-playfair), var(--font-rubik), Georgia, "Times New Roman", serif;
-  --font-serif: var(--font-playfair), Georgia, serif;
-  --font-body: var(--font-rubik), system-ui, sans-serif;
+  /* Display: Outfit for Latin, Onest for Cyrillic (Outfit has none); body: Inter.
+     Onest and Inter both cover Mongolian Ү/Ө. */
+  --font-display: var(--font-outfit), var(--font-onest), system-ui, sans-serif;
+  --font-serif: var(--font-outfit), var(--font-onest), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 

@@ -73,7 +73,9 @@ export function AddToCart({ product }: { product: Product }) {
           <p className="tiny text-center mt-2">{t("pdp.outOfStock")}</p>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        {/* Side by side only when the column is wide enough (full-width on sm,
+            stacked in the narrower two-column layout until xl). */}
+        <div className="flex flex-col sm:flex-row md:flex-col xl:flex-row gap-3 mt-6">
           <button
             onClick={(e) => handleAdd(e.currentTarget)}
             className="btn btn-dark flex-1 justify-center"

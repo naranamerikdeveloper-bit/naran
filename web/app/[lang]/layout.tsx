@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Playfair_Display, Rubik, JetBrains_Mono } from "next/font/google";
+import { Outfit, Onest, Inter, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
 import { Toast } from "@/components/Toast";
 import { MobileTabBar } from "@/components/MobileTabBar";
@@ -31,9 +31,14 @@ export function generateStaticParams() {
 
 // Self-hosted via next/font: no render-blocking external CSS, no FOUT (swap + fallback).
 // Only the weights actually used are requested — trims the font payload for a faster LCP.
-// Elegant high-contrast serif for display/headings — full Cyrillic (Mongolian) support.
-const playfair = Playfair_Display({ subsets: ["latin", "cyrillic"], weight: ["600", "700", "800", "900"], variable: "--font-playfair", display: "swap" });
-const rubik = Rubik({ subsets: ["latin", "cyrillic"], weight: ["400", "500", "600", "700"], variable: "--font-rubik", display: "swap" });
+// Headings: Outfit (geometric sans). Outfit has no Cyrillic at all, so Mongolian
+// headings use Onest — the closest geometric face with full Cyrillic incl. Ү/Ө
+// (U+04AE/U+04E8, cyrillic-ext). The CSS stack is Outfit → Onest, so each script
+// gets a matching glyph instead of falling back to a system font.
+const outfit = Outfit({ subsets: ["latin", "latin-ext"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
+const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--font-onest", display: "swap" });
+// Body: Inter, with cyrillic-ext for Ү/Ө.
+const inter = Inter({ subsets: ["latin", "cyrillic", "cyrillic-ext"], weight: ["300", "400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains", display: "swap" });
 
 export default function LangLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
@@ -41,7 +46,7 @@ export default function LangLayout({ children, params }: { children: React.React
   const lang = params.lang;
   const t = tFor(lang);
   return (
-    <html lang={lang} className={`${playfair.variable} ${rubik.variable} ${mono.variable}`}>
+    <html lang={lang} className={`${outfit.variable} ${onest.variable} ${inter.variable} ${mono.variable}`}>
       <body className="font-sans pb-24 lg:pb-0">
         <a href="#main" className="skip-link">{t("a11y.skip")}</a>
         <LangProvider lang={lang}>
