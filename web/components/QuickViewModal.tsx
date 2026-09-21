@@ -21,7 +21,6 @@ export function QuickViewModal() {
 
   const open = !!product;
   const [qty, setQty] = useState(1);
-  const [color, setColor] = useState("");
   const [size, setSize] = useState("");
   const closeRef = useRef<HTMLButtonElement>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
@@ -32,7 +31,6 @@ export function QuickViewModal() {
   useEffect(() => {
     if (!product) return;
     setQty(1);
-    setColor(product.colors[0]);
     setSize(product.sizes.length > 1 ? "" : product.sizes[0]);
   }, [product]);
 
@@ -54,6 +52,8 @@ export function QuickViewModal() {
 
   const sizable = !!product && product.sizes.length > 1;
   const sizeStock = (s: string) => product?.variants?.find(v => v.size === s)?.stock ?? 9999;
+  const priceOf = (s: string) => product?.variants?.find(v => v.size === s)?.price ?? product?.price ?? 0;
+  const hasRange = !!product && new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1;
   const soldOut = !!product && (product.variants?.length ?? 0) > 0 && product.variants!.every(v => v.stock === 0);
 
   function handleAdd(src?: HTMLElement | null) {
@@ -99,7 +99,7 @@ export function QuickViewModal() {
                 fallback={<div className="absolute inset-0 grid place-items-center card-dark"><ProductVisual product={product} size="lg"/></div>}
                 imgClassName="absolute inset-0 w-full h-full object-cover"/>
               {product.badge && (
-                <span className={`absolute top-4 left-4 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-ink" : "bg-white text-ink"}`}>{product.badge}</span>
+                <span className={`absolute top-4 left-4 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-white" : "bg-white text-ink"}`}>{product.badge}</span>
               )}
             </div>
 
@@ -118,23 +118,12 @@ export function QuickViewModal() {
               )}
 
               <div className="flex items-baseline gap-3 mt-4">
-                <span className="font-display text-[26px] text-accent-deep">{money(product.price)}</span>
+                {hasRange && !size && <span className="text-[13px] text-muted">{t("common.from")}</span>}
+                <span className="font-display text-[26px] text-accent-deep">{money(size ? priceOf(size) : product.price)}</span>
                 {product.was && <span className="text-subtle line-through num-tabular">{money(product.was)}</span>}
               </div>
 
               <p className="text-muted text-[14px] leading-relaxed mt-4 line-clamp-3">{product.description}</p>
-
-              {/* Colour */}
-              <div className="mt-5">
-                <div className="text-[13px] font-semibold mb-2">{t("common.colour")}</div>
-                <div className="flex gap-2.5">
-                  {product.colors.map(c => (
-                    <button key={c} onClick={() => setColor(c)} aria-label={c}
-                      className="w-8 h-8 rounded-full border-[3px] border-white"
-                      style={{ background: c, boxShadow: color === c ? "0 0 0 2px #0E0F10" : "0 0 0 1px rgba(14,15,16,.08)" }}/>
-                  ))}
-                </div>
-              </div>
 
               {/* Size */}
               {sizable && (
@@ -148,7 +137,10 @@ export function QuickViewModal() {
                           className={`min-w-[48px] px-3.5 py-2 rounded-pill border text-sm transition ${
                             out ? "border-line bg-surface-2 text-subtle line-through cursor-not-allowed"
                             : size === s ? "bg-ink text-white border-ink" : "border-line bg-white hover:border-ink"
-                          }`}>{s}</button>
+                          }`}>
+                          {s}
+                          {hasRange && <span className="ml-1.5 opacity-70 num-tabular">{money(priceOf(s))}</span>}
+                        </button>
                       );
                     })}
                   </div>

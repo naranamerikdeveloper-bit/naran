@@ -115,11 +115,13 @@ export function HeroCarousel({ slides }: { slides: Slide[] }) {
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"/> {s.kicker}
               </motion.span>
               <div>
-                <motion.h2 {...rise(on, 0.13)} className="font-display uppercase leading-[.85] tracking-[-.02em] text-[clamp(34px,9vw,72px)]">
-                  {s.top}<br/><span className="text-accent">{s.accent}</span>
+                {/* leading ≥1: Cyrillic capitals carry marks above (Й, Ё) that
+                    collide with the line above at tighter leading. */}
+                <motion.h2 {...rise(on, 0.13)} className="font-display uppercase leading-[1.02] tracking-[.01em] text-[clamp(32px,8.5vw,68px)] [text-shadow:0_2px_24px_rgba(14,15,16,.35)]">
+                  {s.top}<br/><span className="text-petal">{s.accent}</span>
                 </motion.h2>
                 <motion.p {...rise(on, 0.21)} className="text-white/70 text-[13px] mt-2 max-w-[260px]">{s.desc}</motion.p>
-                <motion.span {...rise(on, 0.29)} className="inline-flex items-center gap-2.5 h-11 pl-5 pr-1.5 mt-5 rounded-pill bg-accent text-ink text-[13px] font-semibold uppercase tracking-wide transition-transform duration-300 ease-spring group-hover:-translate-y-0.5">
+                <motion.span {...rise(on, 0.29)} className="inline-flex items-center gap-2.5 h-11 pl-5 pr-1.5 mt-5 rounded-pill bg-accent text-white text-[13px] font-semibold uppercase tracking-wide transition-transform duration-300 ease-spring group-hover:-translate-y-0.5">
                   {t("common.shopNow")}
                   <span className="w-8 h-8 rounded-full bg-white text-ink grid place-items-center transition-transform duration-300 ease-spring group-hover:translate-x-0.5 group-hover:-translate-y-0.5"><ArrowUpRight width={14} height={14}/></span>
                 </motion.span>

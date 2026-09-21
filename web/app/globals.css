@@ -12,14 +12,14 @@
 }
 
 html, body {
-  background: #E9E9EB;
+  background: #F8F1F4;
   color: #0E0F10;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: clip; /* safety net against horizontal overflow (sticky-safe) */
 }
-::selection { background: #0E0F10; color: #fff; }
+::selection { background: #D1356F; color: #fff; }
 
 /* The elegant serif reads best with a whisper of POSITIVE tracking in uppercase,
    not the tight negative default. One rule relaxes every display heading that
@@ -31,7 +31,7 @@ html, body {
    Mouse clicks don't trigger :focus-visible, so this stays unobtrusive. */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
 textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid #FF6A1A;
+  outline: 2px solid #D1356F;
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -123,7 +123,7 @@ html.lenis, html.lenis body { height: auto; }
   box-shadow:
     0 2px 3px rgba(14,15,16,.05),
     0 10px 20px -8px rgba(14,15,16,.13),
-    0 22px 40px -22px rgba(232,85,10,.14);
+    0 22px 40px -22px rgba(174, 34, 87,.14);
 }
 
 .grainy { position: relative; }
@@ -148,7 +148,7 @@ html.lenis, html.lenis body { height: auto; }
            active:translate-y-0 active:scale-[.97];
   }
   /* Warm, brand-tinted lift on the primary CTA (not a flat grey shadow). */
-  .btn-primary { @apply bg-accent text-ink hover:bg-accent-deep hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-10px_rgba(232,85,10,.5)]; }
+  .btn-primary { @apply bg-accent text-white hover:bg-accent-deep hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-10px_rgba(209,53,111,.55)]; }
   .btn-dark    { @apply bg-ink text-white hover:-translate-y-0.5 hover:shadow-lift; }
   .btn-ghost   { @apply bg-surface-2 text-ink hover:bg-white hover:shadow-soft hover:-translate-y-0.5; }
   .btn-light   { @apply bg-white text-ink hover:bg-mist hover:-translate-y-0.5 hover:shadow-soft; }
@@ -226,18 +226,22 @@ html.lenis, html.lenis body { height: auto; }
 
   .text-balance { text-wrap: balance; }
 
-  /* Clean studio background — soft top light over a neutral near-white, no colour tints */
+  /* Petal background — soft white light with blush / rose glows, like light
+     through flower petals. Kept very low-saturation so product photos stay true. */
   .mesh-light {
     background:
-      radial-gradient(1000px 620px at 50% -10%, #FFFFFF 0%, transparent 60%),
-      radial-gradient(720px 520px at 104% 104%, #ECECEE 0%, transparent 55%),
-      #F3F3F4;
+      radial-gradient(1000px 620px at 50% -12%, #FFFFFF 0%, transparent 60%),
+      radial-gradient(760px 520px at -6% 8%, #FDE3ED 0%, transparent 58%),
+      radial-gradient(820px 560px at 106% 30%, #FBE9F1 0%, transparent 60%),
+      radial-gradient(720px 520px at 104% 104%, #F6DCE7 0%, transparent 55%),
+      #FBF5F7;
   }
   .mesh-warm {
     background:
-      radial-gradient(1000px 620px at 50% -10%, #FFFFFF 0%, transparent 60%),
-      radial-gradient(720px 520px at 104% 104%, #ECECEE 0%, transparent 55%),
-      #F3F3F4;
+      radial-gradient(1000px 620px at 50% -12%, #FFFFFF 0%, transparent 60%),
+      radial-gradient(760px 520px at -6% 8%, #FDE3ED 0%, transparent 58%),
+      radial-gradient(720px 520px at 104% 104%, #F6DCE7 0%, transparent 55%),
+      #FBF5F7;
   }
   .mesh-dark {
     background:

@@ -20,7 +20,9 @@ const config: Config = {
         cloud:     "#EDEDEF",
         mist:      "#F0F0F2",
         paper:     "#FFFFFF",
-        accent:    { DEFAULT: "#FF6A1A", deep: "#E8550A", soft: "#FFEAD9" },
+        accent:    { DEFAULT: "#D1356F", deep: "#AE2257", soft: "#FCE7EF" },
+        // Floral rose palette: petal = light pink for gradients/decoration.
+        petal:     { DEFAULT: "#F6B3CB", light: "#FFF1F6" },
         lime:      { DEFAULT: "#D7F26B", deep: "#BFE03E", dark: "#9FBF24" },
         camel:     { DEFAULT: "#C19A6B", deep: "#A87E4E" },
         muted:     "#5C5F63",

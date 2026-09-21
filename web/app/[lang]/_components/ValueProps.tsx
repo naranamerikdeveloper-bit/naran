@@ -25,10 +25,10 @@ export function ValueProps({ lang }: { lang: Lang }) {
           <Reveal key={k} delay={i * 0.07} y={22} className="h-full">
             <TiltCard className="group h-full flex items-center gap-3.5 sm:gap-4 bg-white border border-line rounded-[1.5rem] p-4 sm:p-5 elev-3d elev-3d-hover transition-colors duration-200 hover:border-accent/30">
               <span
-                className="depth relative overflow-hidden w-12 h-12 sm:w-14 sm:h-14 rounded-2xl grid place-items-center text-accent-deep shrink-0 transition-colors duration-300 group-hover:text-white shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_10px_20px_-10px_rgba(232,85,10,.45)]"
-                style={{ background: "linear-gradient(150deg,#FFEAD9,#FFFFFF)" }}
+                className="depth relative overflow-hidden w-12 h-12 sm:w-14 sm:h-14 rounded-2xl grid place-items-center text-accent-deep shrink-0 transition-colors duration-300 group-hover:text-white shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_10px_20px_-10px_rgba(174, 34, 87,.45)]"
+                style={{ background: "linear-gradient(150deg,#FCE7EF,#FFFFFF)" }}
               >
-                <span className="hover-icon-bg absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: "linear-gradient(150deg,#FF8A3D,#E8550A)" }} aria-hidden />
+                <span className="hover-icon-bg absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: "linear-gradient(150deg,#F07CA5,#AE2257)" }} aria-hidden />
                 <span className="relative"><Icon /></span>
               </span>
               <div className="depth-sm min-w-0">

@@ -55,7 +55,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             <span className="absolute top-3 left-3 z-10 text-[10px] uppercase tracking-[.14em] font-semibold px-2.5 h-6 rounded-pill grid place-items-center bg-ink text-white">{t("common.soldOut")}</span>
           ) : product.badge && (
             <span className={`absolute top-3 left-3 z-10 text-[10px] uppercase tracking-[.14em] font-semibold px-2.5 h-6 rounded-pill grid place-items-center ${
-              product.badge === "New" ? "bg-accent text-ink" : "bg-white/90 text-ink"
+              product.badge === "New" ? "bg-accent text-white" : "bg-white/90 text-ink"
             }`}>{product.badge}</span>
           )}
 

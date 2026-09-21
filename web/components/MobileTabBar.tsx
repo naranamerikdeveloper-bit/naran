@@ -22,7 +22,7 @@ export function MobileTabBar() {
         return (
           <Link key={href} href={href} aria-label={label}
             className={`flex items-center justify-center gap-2 h-11 rounded-pill text-[12px] font-semibold transition-all ${
-              active ? "bg-accent text-ink px-5 flex-[1.4]" : "text-white/60 flex-1"
+              active ? "bg-accent text-white px-5 flex-[1.4]" : "text-white/60 flex-1"
             }`}>
             <Icon width={19} height={19}/>
             {active && <span>{label}</span>}

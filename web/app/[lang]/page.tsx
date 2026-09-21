@@ -65,12 +65,12 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
         title: cms.promo.title[L] || cms.promo.title.mn,
         desc: cms.promo.desc[L] || cms.promo.desc.mn,
         cta: cms.promo.cta[L] || cms.promo.cta.mn,
-        href: cms.promo.href || "/shop?filter=sale",
+        href: cms.promo.href || "/shop",
         img: cms.promo.img || hotImg,
       }
     : {
         kicker: t("home.promoKicker"), title: t("home.promoTitle"), desc: t("home.promoDesc"),
-        cta: t("home.promoCta"), href: "/shop?filter=sale", img: hotImg,
+        cta: t("home.promoCta"), href: "/shop", img: hotImg,
       };
 
   // Site-wide structured data (Organization + WebSite with a Sitelinks search box).
@@ -134,9 +134,9 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
             <div className="relative overflow-hidden rounded-[2rem] bg-accent text-white grid grid-cols-1 lg:grid-cols-2 items-center min-h-[280px]">
               <div className="absolute -right-20 -bottom-20 w-72 h-72 rounded-full bg-white/15 blur-2xl"/>
               <div className="relative z-10 p-8 sm:p-12">
-                <span className="eyebrow text-ink/75">{promo.kicker}</span>
-                <h2 className="hd-2 mt-3 text-ink">{promo.title}</h2>
-                <p className="text-ink/80 mt-3 max-w-[360px]">{promo.desc}</p>
+                <span className="eyebrow text-white/80">{promo.kicker}</span>
+                <h2 className="hd-2 mt-3 text-white">{promo.title}</h2>
+                <p className="text-white/85 mt-3 max-w-[360px]">{promo.desc}</p>
                 <Link href={promo.href} className="btn btn-light mt-6">
                   {promo.cta}
                   <span className="arrow-cap"><ArrowUpRight width={14} height={14}/></span>
@@ -181,7 +181,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
       <section className="pb-16 lg:pb-24">
         <div className="container">
           <Reveal blur
-            className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(232,85,10,.35)]">
+            className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(174,34,87,.35)]">
             {/* faint warm corner bloom — matches the footer */}
             <div className="pointer-events-none absolute -top-24 right-[8%] h-56 w-56 rounded-full bg-accent/10 blur-3xl"/>
             <div className="relative z-10">
