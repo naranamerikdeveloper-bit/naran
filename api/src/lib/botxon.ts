@@ -35,7 +35,7 @@ async function gwFetch<T>(path: string, init: any = {}): Promise<T> {
   const headers: Record<string, string> = { Authorization: `Bearer ${KEY}` };
   let body: string | undefined;
   if (init.json) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
-  const res = await fetch(`${URL_BASE}${path}`, { ...init, body, headers, cache: "no-store" } as any);
+  const res = await fetch(`${URL_BASE}${path}`, { ...init, body, headers, cache: "no-store", signal: AbortSignal.timeout(10_000) } as any);
   const data: any = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error?.message || data?.message || `Botxon failed (${res.status})`);
   return data as T;

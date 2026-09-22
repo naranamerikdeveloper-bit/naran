@@ -37,7 +37,8 @@ export async function audit(
     if (!store) return;
     const list: AuditEntry[] = Array.isArray((store.metadata as any)?.[KEY]) ? (store.metadata as any)[KEY] : [];
     const next = [full, ...list].slice(0, CAP);
-    await storeModule.updateStores(store.id, { metadata: { ...(store.metadata || {}), [KEY]: next } } as any);
+    // Only our key — Medusa merges it into the fresh metadata (no clobbering).
+    await storeModule.updateStores(store.id, { metadata: { [KEY]: next } } as any);
   } catch { /* never block the primary action on audit failure */ }
 }
 

@@ -20,7 +20,7 @@ const NotificationsPage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/admin/notifications", { credentials: "include", headers: { "content-type": "application/json" } });
+      const res = await fetch("/admin/naran-notifications", { credentials: "include", headers: { "content-type": "application/json" } });
       if (!res.ok) throw new Error(`(${res.status})`);
       const j = await res.json();
       setItems(j.items || []);

@@ -63,7 +63,9 @@ export async function writeHomepage(scope: { resolve: (k: any) => any }, content
   const { storeModule, store } = await getStore(scope);
   if (!store) throw new Error("Store not found");
   await storeModule.updateStores(store.id, {
-    metadata: { ...(store.metadata || {}), [KEY]: content },
+    // Only our key: Medusa merges metadata against the fresh record, so writing
+    // the whole (possibly stale) object could revert other keys saved meanwhile.
+    metadata: { [KEY]: content },
   } as any);
   return content;
 }

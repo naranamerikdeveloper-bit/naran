@@ -98,7 +98,8 @@ function DeliveryFee({ canWrite }: { canWrite: boolean }) {
     } catch (e: any) { toast.error(e.message || "Хадгалж чадсангүй"); }
     finally { setSaving(false); }
   };
-  const parsed = Number(input.replace(/[^0-9]/g, ""));
+  const digits = input.replace(/[^0-9]/g, "");
+  const parsed = Number(digits);
   return (
     <div className="flex flex-wrap items-center gap-3 px-6 py-4">
       <div className="min-w-0 mr-auto">
@@ -114,8 +115,8 @@ function DeliveryFee({ canWrite }: { canWrite: boolean }) {
               onChange={e => setInput(e.target.value)} placeholder="0" aria-label="Хүргэлтийн төлбөр (₮)" />
             <Text size="small" className="text-ui-fg-subtle">₮</Text>
           </div>
-          <Button size="small" onClick={() => save(parsed)} isLoading={saving} disabled={saving || fee === null || parsed === fee}>Хадгалах</Button>
-          {fee !== 0 && <Button size="small" variant="secondary" onClick={() => save(0)} disabled={saving}>Үнэгүй болгох</Button>}
+          <Button size="small" onClick={() => save(parsed)} isLoading={saving} disabled={saving || fee === null || digits === "" || parsed === fee}>Хадгалах</Button>
+          {fee !== null && fee !== 0 && <Button size="small" variant="secondary" onClick={() => save(0)} disabled={saving}>Үнэгүй болгох</Button>}
         </>
       )}
     </div>

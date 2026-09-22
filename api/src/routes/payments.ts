@@ -59,10 +59,14 @@ function reportUnfulfilledPayment(intentId: string, rec: Record, err: Error) {
 
 // Authoritative amount: the cart's server-side total (never trust a client-sent
 // amount — otherwise a buyer could pay less than the order is worth).
+// Network-level failure → worth retrying; doesn't count as a completion attempt.
+const transient = (e: any) => Object.assign(new Error(e?.message || "network error"), { transient: true });
+
 async function cartTotal(cartId: string): Promise<number> {
   const res = await fetch(`${MEDUSA_URL}/store/carts/${cartId}?fields=id,total,currency_code`, {
     headers: { "content-type": "application/json", "x-publishable-api-key": MEDUSA_PK },
-  });
+  }).catch((e) => { throw transient(e); });
+  if (res.status >= 500) throw transient(new Error(`Medusa ${res.status}`));
   const data: any = await res.json().catch(() => ({}));
   const total = data?.cart?.total;
   if (typeof total !== "number" || !Number.isFinite(total)) throw new Error("Cart not found");
@@ -117,9 +121,13 @@ async function completeMedusaCart(cartId: string, shippingMethod: "standard" | "
     method: "POST",
     headers: { "content-type": "application/json", "x-publishable-api-key": MEDUSA_PK, "x-naran-internal": INTERNAL_TOKEN },
     body: "{}",
-  });
+  }).catch((e) => { throw transient(e); });
   const data: any = await res.json().catch(() => ({}));
-  if (data?.type !== "order") throw new Error(data?.message || "Cart completion failed");
+  if (data?.type !== "order") {
+    const err: any = new Error(data?.message || `Cart completion failed (${res.status})`);
+    if (res.status >= 500) err.transient = true;
+    throw err;
+  }
   const o = data.order;
   return {
     id: o.display_id ? `NT-${o.display_id}` : o.id,
@@ -159,6 +167,9 @@ const isOpen = (r: Record) =>
 function saveInvoice(id: string, rec: Record) {
   invoices.set(id, rec);
   void putRecord(id, rec, isOpen(rec));
+  // Finished records live on in Redis; keep memory bounded (the status poll
+  // can still read them back via loadInvoice).
+  if (!isOpen(rec)) setTimeout(() => { if (invoices.get(id) === rec) invoices.delete(id); }, 15 * 60_000).unref();
 }
 
 async function loadInvoice(id: string): Promise<Record | undefined> {
@@ -189,7 +200,7 @@ async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
   if (!cartId) return null; // unknown invoice
 
   const rec: Record =
-    cached ?? { cartId, amount: Math.round(inv.amount || 0), email: "", shippingMethod: "standard", status: "pending", attempts: 0 };
+    cached ?? { cartId, amount: Math.round(inv.amount || 0), email: "", shippingMethod: "standard", status: "pending", attempts: 0, createdAt: Date.now() };
 
   // Terminal failure from the gateway → stop polling, no order.
   if (inv.status === "failed") { rec.status = "failed"; saveInvoice(invoiceId, rec); return rec; }
@@ -198,32 +209,44 @@ async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
 
   // Money is in. Turn the cart into a Medusa order (idempotent); on persistent
   // failure flag for reconciliation rather than losing a paid order (B2).
-  rec.attempts = (rec.attempts ?? 0) + 1;
+  const mismatch = (e: Error) => {
+    // A human must reconcile/refund: no retries, alert once.
+    rec.status = "needs_review";
+    rec.attempts = MAX_SETTLE_ATTEMPTS;
+    reportUnfulfilledPayment(invoiceId, rec, e);
+  };
+  // What was collected: Botxon's reported amount, else what we invoiced. A
+  // missing amount must not lock every payment into manual review.
+  const collected = Math.round(Number(inv.amount) > 0 ? Number(inv.amount) : rec.amount);
   try {
     // Amount integrity: the cart stays editable after the invoice is issued, so
     // items could be added after paying a smaller invoice. Only complete when
-    // what Botxon collected equals the cart's current total.
-    const paidAmount = Math.round(Number(inv.amount));
+    // what was collected equals the cart's current total.
     const due = await cartTotal(cartId);
-    if (!Number.isFinite(paidAmount) || paidAmount !== due) {
-      rec.attempts = MAX_SETTLE_ATTEMPTS; // no retry: a human must reconcile/refund
-      throw new Error(`amount mismatch: paid ${paidAmount}, cart total ${due}`);
+    if (!(collected > 0) || collected !== due) {
+      mismatch(new Error(`amount mismatch before completion: paid ${collected}, cart total ${due}`));
+      saveInvoice(invoiceId, rec);
+      return rec;
     }
     const order = await completeMedusaCart(cartId, rec.shippingMethod);
     rec.order = order;
     rec.amount = order.total;
-    rec.status = "paid";
-    // Amount integrity: what Botxon collected must equal the order total.
-    const paid = typeof inv.amount === "number" ? Math.round(inv.amount) : null;
-    if (paid != null && paid !== order.total) {
-      console.error(`[botxon] amount mismatch invoice=${invoiceId} paid=${paid} order=${order.total}`);
-      try { Sentry.captureMessage(`Botxon amount mismatch: invoice ${invoiceId} paid ${paid} vs order ${order.total}`, "warning"); } catch { /* no DSN */ }
+    if (order.total !== collected) {
+      // Cart changed between the check and completion (race): the order exists
+      // but must not ship until someone reconciles it.
+      mismatch(new Error(`amount mismatch after completion: paid ${collected}, order ${order.total} (${order.id}) — hold fulfilment`));
+      saveInvoice(invoiceId, rec);
+      return rec;
     }
+    rec.status = "paid";
     if (!rec.emailed) { rec.emailed = true; sendOrderConfirmation(order).catch(() => {}); }
   } catch (e: any) {
     rec.status = "needs_review";
-    if (rec.attempts >= MAX_SETTLE_ATTEMPTS) reportUnfulfilledPayment(invoiceId, rec, e);
-    else console.error(`[botxon] completion attempt ${rec.attempts}/${MAX_SETTLE_ATTEMPTS} failed for cart ${cartId}: ${e.message}`);
+    // Transient failures (Medusa restarting, network) don't use up attempts —
+    // the poll/reconciler keeps retrying. Only real rejections count.
+    if (!e?.transient) rec.attempts = (rec.attempts ?? 0) + 1;
+    if (rec.attempts! >= MAX_SETTLE_ATTEMPTS) reportUnfulfilledPayment(invoiceId, rec, e);
+    else console.error(`[botxon] completion ${e?.transient ? "transient failure" : `attempt ${rec.attempts}/${MAX_SETTLE_ATTEMPTS} failed`} for cart ${cartId}: ${e.message}`);
   }
   saveInvoice(invoiceId, rec);
   return rec;
@@ -291,7 +314,7 @@ router.get("/botxon/invoice", statusLimit, async (req, res) => {
       rec.status === "paid" ? "succeeded" :
       rec.status === "failed" ? "failed" :
       exhausted ? "review" : "pending";
-    res.json({ data: { status, order: publicOrder(rec.order), invoice: rec.invoice ?? null } });
+    res.json({ data: { status, order: publicOrder(rec.order), invoice: rec.invoice ?? null, amount: rec.amount } });
   } catch (e: any) {
     console.error("botxon settle error:", e.message);
     // A transient gateway error must not end the customer's payment session:
@@ -311,15 +334,20 @@ router.get("/botxon/invoice", statusLimit, async (req, res) => {
 const RECONCILE_MS = 60_000;
 const RECONCILE_MAX_AGE_MS = 3 * 60 * 60_000;
 if (BOTXON_LIVE) {
+  let running = false; // never overlap runs
   setInterval(async () => {
-    for (const id of await pendingIds()) {
-      const rec = await loadInvoice(id);
-      if (!rec || !isOpen(rec) || Date.now() - (rec.createdAt ?? 0) > RECONCILE_MAX_AGE_MS) {
-        await dropPending(id);
-        continue;
+    if (running) return;
+    running = true;
+    try {
+      for (const id of await pendingIds()) {
+        const rec = await loadInvoice(id);
+        if (!rec || !isOpen(rec) || Date.now() - (rec.createdAt ?? 0) > RECONCILE_MAX_AGE_MS) {
+          await dropPending(id);
+          continue;
+        }
+        try { await settleBotxon(id); } catch (e: any) { console.error(`[reconcile] ${id}: ${e.message}`); }
       }
-      try { await settleBotxon(id); } catch (e: any) { console.error(`[reconcile] ${id}: ${e.message}`); }
-    }
+    } finally { running = false; }
   }, RECONCILE_MS).unref();
 }
 

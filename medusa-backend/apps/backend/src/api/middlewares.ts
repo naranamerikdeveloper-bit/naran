@@ -66,11 +66,13 @@ function internalOnly(req: MedusaRequest, res: MedusaResponse, next: MedusaNextF
 }
 
 // Core POST /admin/users/:id accepts arbitrary metadata, and roles live in
-// user.metadata.role — so any admin could promote themselves. Changing a role
-// (on anyone, including yourself) needs team.manage.
+// user.metadata.role — so any admin could promote themselves, either by setting
+// role or by wiping metadata (null / {}), which removes the role entirely. Any
+// metadata change (on anyone, including yourself) needs team.manage; name and
+// avatar edits stay open.
 const guardRoleChange = (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
-  const meta = (req.body as any)?.metadata;
-  if (meta && typeof meta === "object" && "role" in meta) return requirePermission("team.manage")(req, res, next);
+  const body = req.body as any;
+  if (body && typeof body === "object" && "metadata" in body) return requirePermission("team.manage")(req, res, next);
   next();
 };
 
@@ -100,6 +102,12 @@ async function guardUpload(req: MedusaRequest, res: MedusaResponse, next: Medusa
   }
 }
 
+const guardStoreMetadata = (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
+  const body = req.body as any;
+  if (body && typeof body === "object" && "metadata" in body) return requirePermission("team.manage")(req, res, next);
+  next();
+};
+
 export default defineMiddlewares({
   routes: [
     // --- Auth rate limiting (login / register / password reset), both actor types ---
@@ -108,6 +116,9 @@ export default defineMiddlewares({
     { matcher: "/auth/:actor/emailpass/reset-password", methods: ["POST"], middlewares: [resetLimit] },
 
     { matcher: "/admin/catalog/*", methods: ["GET"], middlewares: [requirePermission("catalog.read")] },
+    // CSV import posts the whole file as JSON — the 100KB default rejects real catalogs.
+    { matcher: "/admin/catalog/import", methods: ["POST"], bodyParser: { sizeLimit: "10mb" } },
+    { matcher: "/admin/catalog/stock", methods: ["POST"], bodyParser: { sizeLimit: "10mb" } },
     { matcher: "/admin/catalog/*", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
     { matcher: "/admin/analytics/*", methods: ["GET"], middlewares: [requirePermission("analytics.read")] },
     { matcher: "/admin/fulfillment/*", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
@@ -120,12 +131,15 @@ export default defineMiddlewares({
     { matcher: "/admin/reports/*", methods: ["GET"], middlewares: [requirePermission("reports.read")] },
     { matcher: "/admin/marketing/*", methods: ["GET"], middlewares: [requirePermission("promotions.write")] },
     { matcher: "/admin/audit", methods: ["GET"], middlewares: [requirePermission("team.manage")] },
-    { matcher: "/admin/notifications", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
+    { matcher: "/admin/naran-notifications", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
     { matcher: "/admin/returns/:id/approve", methods: ["POST"], middlewares: [requirePermission("returns.write")] },
     { matcher: "/admin/users/:id/role", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
 
     // --- Team / access management (core routes) ---
     { matcher: "/admin/users/:id", methods: ["POST"], middlewares: [guardRoleChange] },
+    // Store metadata holds the CMS content, delivery option, audit log and stock
+    // history — core POST /admin/stores/:id would let any admin overwrite them.
+    { matcher: "/admin/stores/:id", methods: ["POST"], middlewares: [guardStoreMetadata] },
     { matcher: "/admin/users/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/invites", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
     // Not /admin/invites/accept — invited users (no role yet) call that to join.
@@ -136,6 +150,8 @@ export default defineMiddlewares({
 
     // --- Admin file uploads ---
     { matcher: "/admin/uploads", methods: ["POST"], middlewares: [guardUpload] },
+    { matcher: "/admin/uploads/presigned-urls", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
+    { matcher: "/admin/uploads/:id", methods: ["DELETE"], middlewares: [requirePermission("catalog.write")] },
 
     // --- Payment safety: carts become orders only via the payments gateway ---
     { matcher: "/store/carts/:id/complete", methods: ["POST"], middlewares: [internalOnly] },

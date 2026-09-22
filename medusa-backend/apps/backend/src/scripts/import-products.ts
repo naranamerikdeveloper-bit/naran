@@ -1,3 +1,4 @@
+import { assertDestructiveAllowed } from "../lib/destructive-guard";
 import { ExecArgs } from "@medusajs/framework/types";
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import { createProductsWorkflow } from "@medusajs/medusa/core-flows";
@@ -50,6 +51,7 @@ function parseCsv(text: string): Record<string, string>[] {
 }
 
 export default async function importProducts({ container }: ExecArgs) {
+  if (process.env.PURGE_PREFIX) assertDestructiveAllowed("import-products (PURGE_PREFIX)");
   const logger = container.resolve("logger");
   const productModule = container.resolve(Modules.PRODUCT);
   const salesChannelModule = container.resolve(Modules.SALES_CHANNEL);

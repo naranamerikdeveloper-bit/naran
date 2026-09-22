@@ -71,6 +71,7 @@ function matchFile(name: string, handles: Set<string>): { handle: string; order:
 const ImagesPage = () => {
   const { loading: permLoading, can } = usePermissions();
   const [items, setItems] = useState<Item[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null); // product id or "bulk"
   const [bulk, setBulk] = useState<File[]>([]);
@@ -81,9 +82,13 @@ const ImagesPage = () => {
   const load = useCallback(async () => {
     try {
       const r = await fetch("/admin/catalog/hidden-no-image", { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       setItems(d.items || []);
+      setLoadError(false);
     } catch {
+      // Don't show "every product has a picture" when we simply couldn't load.
+      setLoadError(true);
       setItems([]);
     }
   }, []);
@@ -221,7 +226,7 @@ const ImagesPage = () => {
         {items === null ? (
           <Text className="px-4 py-6 text-ui-fg-subtle">Ачаалж байна…</Text>
         ) : filtered.length === 0 ? (
-          <Text className="px-4 py-6 text-ui-fg-subtle">{items.length ? "Олдсонгүй." : "Бүх бараа зурагтай 🎉"}</Text>
+          <Text className="px-4 py-6 text-ui-fg-subtle">{loadError ? "Жагсаалтыг ачаалж чадсангүй (эрх эсвэл сүлжээ). Хуудсыг дахин ачаална уу." : items.length ? "Олдсонгүй." : "Бүх бараа зурагтай 🎉"}</Text>
         ) : (
           <div className="divide-y divide-ui-border-base max-h-[60vh] overflow-y-auto">
             {filtered.map(item => (

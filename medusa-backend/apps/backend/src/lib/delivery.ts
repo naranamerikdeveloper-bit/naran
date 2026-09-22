@@ -57,7 +57,7 @@ export async function setDeliveryFee(scope: any, fee: number) {
   const { storeModule, store } = await getStore(scope);
   if (store) {
     await storeModule.updateStores(store.id, {
-      metadata: { ...(store.metadata || {}), delivery_option_id: current.option_id },
+      metadata: { delivery_option_id: current.option_id }, // merged by Medusa
     });
   }
   return getDelivery(scope);

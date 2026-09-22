@@ -40,7 +40,8 @@ export async function recordMoves(
     if (!store) return;
     const list: StockHistoryEntry[] = Array.isArray((store.metadata as any)?.[KEY]) ? (store.metadata as any)[KEY] : [];
     const next = [...entries, ...list].slice(0, CAP);
-    await storeModule.updateStores(store.id, { metadata: { ...(store.metadata || {}), [KEY]: next } } as any);
+    // Only our key — Medusa merges it into the fresh metadata (no clobbering).
+    await storeModule.updateStores(store.id, { metadata: { [KEY]: next } } as any);
   } catch { /* never block the stock update on history failure */ }
 }
 

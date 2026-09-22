@@ -118,16 +118,15 @@ if (useRedis) {
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
-    // Medusa opens a SEPARATE connection pool per module (~26 of them). At the
-    // driver default each pool grows to 10, so migrations alone can ask for
-    // ~260 connections — far past Postgres' default max_connections=100, and
-    // `db:migrate` then dies with "KnexTimeoutError: Timeout acquiring a
-    // connection. The pool is probably full." Cap each pool instead: the
-    // modules are mostly idle, and server + worker + migrate share one box.
+    // Medusa 2.17 shares ONE Postgres pool across all modules per process
+    // (verified in production: the server held exactly DB_POOL_MAX
+    // connections). 3 was far too few — concurrent checkouts would queue and
+    // time out. 15 per process × server/worker/migrate stays far below the
+    // compose max_connections=300.
     databaseDriverOptions: {
       pool: {
         min: Number(process.env.DB_POOL_MIN ?? 0),
-        max: Number(process.env.DB_POOL_MAX ?? 3),
+        max: Number(process.env.DB_POOL_MAX ?? 15),
       },
     },
     redisUrl: useRedis ? REDIS_URL : undefined,

@@ -1,8 +1,10 @@
+import { assertDestructiveAllowed } from "../lib/destructive-guard";
 import { ExecArgs } from "@medusajs/framework/types";
 import { Modules } from "@medusajs/framework/utils";
 import { createRegionsWorkflow } from "@medusajs/medusa/core-flows";
 
 export default async function seedRegion({ container }: ExecArgs) {
+  assertDestructiveAllowed("seed-region");
   const logger = container.resolve("logger");
   const storeModule = container.resolve(Modules.STORE);
   const regionModule = container.resolve(Modules.REGION);

@@ -57,10 +57,9 @@ services:
   postgres:
     image: postgres:16-alpine
     <<: *restart
-    # The default max_connections=100 is not enough: Medusa keeps a pool per
-    # module in EACH of migrate / server / worker. Pools are capped in
-    # medusa-config.ts (DB_POOL_MAX, default 3) — ~26 modules x 3 x 3 processes
-    # still needs well over 100. Raise both together if you change either.
+    # Each Medusa process (migrate / server / worker) shares one pool of
+    # DB_POOL_MAX (medusa-config.ts, default 15) connections — ~45 in total.
+    # 300 leaves ample headroom; raise both together if you change either.
     command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-naran}
@@ -89,7 +88,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-    mem_limit: 256m
+    # Headroom above maxmemory for AOF rewrites and client buffers.
+    mem_limit: 400m
     networks: [naran]
 
   meilisearch:
@@ -137,7 +137,9 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      meilisearch: { condition: service_healthy }
+      # Started, not healthy: the server has its own search fallback, and an
+      # unhealthy Meilisearch must never keep the store offline.
+      meilisearch: { condition: service_started }
       medusa-migrate: { condition: service_completed_successfully }
     environment:
       <<: *medusa-env

@@ -1,3 +1,4 @@
+import { assertDestructiveAllowed } from "../lib/destructive-guard";
 import { ExecArgs } from "@medusajs/framework/types";
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import { createProductsWorkflow } from "@medusajs/medusa/core-flows";
@@ -47,6 +48,7 @@ const OLD_HANDLES = [
 ];
 
 export default async function seedNaran({ container }: ExecArgs) {
+  assertDestructiveAllowed("seed-naran");
   const logger = container.resolve("logger");
   const productModule = container.resolve(Modules.PRODUCT);
   const salesChannelModule = container.resolve(Modules.SALES_CHANNEL);

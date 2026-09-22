@@ -2,7 +2,8 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { lowStockVariants } from "../../../lib/catalog";
 
-// GET /admin/notifications — operational alerts for the admin dashboard (spec
+// GET /admin/naran-notifications (not /admin/notifications: that path belongs to
+// Medusa's built-in notification bell/feed, which this used to shadow) — operational alerts for the admin dashboard (spec
 // A-29): low stock, pending returns, new orders today. Complements the email
 // subscribers (order.placed / shipment.created). Guarded by orders.read.
 export async function GET(req: MedusaRequest, res: MedusaResponse) {

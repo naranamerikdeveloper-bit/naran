@@ -1,3 +1,4 @@
+import { assertDestructiveAllowed } from "../lib/destructive-guard";
 import { ExecArgs } from "@medusajs/framework/types";
 import { Modules } from "@medusajs/framework/utils";
 import {
@@ -18,6 +19,7 @@ const USD: Record<string, number> = {
 };
 
 export default async function seedMnt({ container }: ExecArgs) {
+  assertDestructiveAllowed("seed-mnt");
   const logger = container.resolve("logger");
   const storeModule = container.resolve(Modules.STORE);
   const regionModule = container.resolve(Modules.REGION);

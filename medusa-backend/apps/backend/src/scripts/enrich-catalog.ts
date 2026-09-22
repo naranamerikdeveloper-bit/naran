@@ -1,3 +1,4 @@
+import { assertDestructiveAllowed } from "../lib/destructive-guard";
 import { ExecArgs } from "@medusajs/framework/types";
 import { Modules } from "@medusajs/framework/utils";
 
@@ -19,6 +20,7 @@ const SUFFIX: Record<string, string> = {
 };
 
 export default async function enrichCatalog({ container }: ExecArgs) {
+  assertDestructiveAllowed("enrich-catalog");
   const logger = container.resolve("logger");
   const productModule = container.resolve(Modules.PRODUCT);
 
