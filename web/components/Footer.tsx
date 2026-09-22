@@ -79,7 +79,7 @@ export function Footer() {
               ))}
             </ul>
             <div className="mt-4 flex flex-wrap gap-2">
-              {["QPay", "SocialPay"].map(m => (
+              {["QPay", t("foot.bankApps")].map(m => (
                 <span key={m} className="rounded-full border border-accent/25 bg-accent-soft/50 px-3 py-1 text-[11.5px] font-semibold text-accent-deep">{m}</span>
               ))}
             </div>

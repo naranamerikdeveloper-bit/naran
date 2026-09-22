@@ -48,14 +48,23 @@ export function Consent() {
       )}
 
       {choice === null && (
-        <div className="fixed bottom-3 inset-x-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:max-w-[420px] z-[60] card p-5 shadow-lift border border-border">
-          <p className="text-sm text-muted leading-relaxed">
+        // Sits above the mobile tab bar (≈80px + safe area) and never overflows:
+        // two equal buttons whose labels shrink/wrap rather than spill out.
+        <div role="dialog" aria-label="Cookie"
+          className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+88px)] lg:bottom-5 sm:inset-x-auto sm:right-5 sm:w-[400px] z-[60] rounded-2xl bg-white p-4 sm:p-5 shadow-[0_20px_50px_-20px_rgba(10,10,11,.4)] border border-line">
+          <p className="text-[13px] sm:text-sm text-muted leading-relaxed">
             {t("cookie.text")}{" "}
             <Link href="/privacy" className="underline hover:text-ink">{t("foot.privacy")}</Link>
           </p>
-          <div className="flex gap-2.5 mt-4">
-            <button onClick={() => decide("accepted")} className="btn btn-primary flex-1 min-w-0 justify-center h-11 px-3 text-[12px] whitespace-normal leading-tight">{t("cookie.accept")}</button>
-            <button onClick={() => decide("declined")} className="btn btn-outline flex-1 min-w-0 justify-center h-11 px-3 text-[12px] whitespace-normal leading-tight text-center">{t("cookie.decline")}</button>
+          <div className="grid grid-cols-2 gap-2 mt-3.5">
+            <button onClick={() => decide("accepted")}
+              className="h-11 min-w-0 px-2 rounded-pill bg-accent text-white text-[12.5px] font-semibold uppercase tracking-wide leading-tight hover:bg-accent-deep active:scale-[.97] transition">
+              {t("cookie.accept")}
+            </button>
+            <button onClick={() => decide("declined")}
+              className="h-11 min-w-0 px-2 rounded-pill border border-ink/20 bg-white text-ink text-[12.5px] font-semibold uppercase tracking-wide leading-tight hover:border-ink active:scale-[.97] transition">
+              {t("cookie.decline")}
+            </button>
           </div>
         </div>
       )}
