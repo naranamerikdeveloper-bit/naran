@@ -1,5 +1,6 @@
 import { defineMiddlewares, MedusaNextFunction, MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { Modules } from "@medusajs/framework/utils";
+import { createHash, timingSafeEqual } from "crypto";
 import { canActor, Permission } from "../lib/rbac";
 import { rateLimit } from "../lib/rate-limit";
 
@@ -41,6 +42,38 @@ function requirePermission(perm: Permission) {
   };
 }
 
+// Cart completion is internal-only. The region's payment provider is the
+// auto-authorizing system default, so a public POST /store/carts/:id/complete
+// would turn any cart into an order without paying. Only the payments gateway
+// (api), after Botxon confirms the money, may complete a cart: it sends
+// x-naran-internal = sha256("naran-internal:" + INTERNAL_API_SECRET).
+function internalOnly(req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) {
+  const secret = process.env.INTERNAL_API_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({ message: "Not allowed" });
+      return;
+    }
+    return next(); // local dev without the secret
+  }
+  const want = createHash("sha256").update(`naran-internal:${secret}`).digest();
+  const got = Buffer.from(String(req.headers["x-naran-internal"] || ""), "hex");
+  if (got.length !== want.length || !timingSafeEqual(got, want)) {
+    res.status(403).json({ message: "Not allowed" });
+    return;
+  }
+  next();
+}
+
+// Core POST /admin/users/:id accepts arbitrary metadata, and roles live in
+// user.metadata.role — so any admin could promote themselves. Changing a role
+// (on anyone, including yourself) needs team.manage.
+const guardRoleChange = (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
+  const meta = (req.body as any)?.metadata;
+  if (meta && typeof meta === "object" && "role" in meta) return requirePermission("team.manage")(req, res, next);
+  next();
+};
+
 export default defineMiddlewares({
   routes: [
     // --- Auth rate limiting (login / register / password reset), both actor types ---
@@ -64,5 +97,18 @@ export default defineMiddlewares({
     { matcher: "/admin/notifications", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
     { matcher: "/admin/returns/:id/approve", methods: ["POST"], middlewares: [requirePermission("returns.write")] },
     { matcher: "/admin/users/:id/role", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
+
+    // --- Team / access management (core routes) ---
+    { matcher: "/admin/users/:id", methods: ["POST"], middlewares: [guardRoleChange] },
+    { matcher: "/admin/users/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },
+    { matcher: "/admin/invites", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
+    // Not /admin/invites/accept — invited users (no role yet) call that to join.
+    { matcher: "/admin/invites/:id/resend", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
+    { matcher: "/admin/invites/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },
+    { matcher: "/admin/api-keys", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
+    { matcher: "/admin/api-keys/*", methods: ["POST", "DELETE"], middlewares: [requirePermission("team.manage")] },
+
+    // --- Payment safety: carts become orders only via the payments gateway ---
+    { matcher: "/store/carts/:id/complete", methods: ["POST"], middlewares: [internalOnly] },
   ],
 });

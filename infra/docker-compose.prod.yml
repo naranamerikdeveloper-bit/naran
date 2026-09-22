@@ -48,6 +48,8 @@ x-medusa-env: &medusa-env
   # Defaults to a value derived from COOKIE_SECRET so no extra setup is needed.
   REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${COOKIE_SECRET}}
   STOREFRONT_REVALIDATE_URL: http://web:3000/api/revalidate
+  # Shared with the api: only it may complete carts into orders (after payment).
+  INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-${JWT_SECRET}}
   RESEND_API_KEY: ${RESEND_API_KEY:-}
   EMAIL_FROM: ${EMAIL_FROM:-NARAN <onboarding@resend.dev>}
 
@@ -168,6 +170,8 @@ services:
       NODE_ENV: production
       PORT: "4000"
       JWT_SECRET: ${JWT_SECRET}
+      # Authorizes cart completion on Medusa (same value as the medusa services).
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-${JWT_SECRET}}
       WEB_ORIGIN: ${STORE_CORS}
       # Medusa (internal service URL) + publishable key — the gateway completes orders.
       MEDUSA_URL: http://medusa:9000
@@ -179,9 +183,6 @@ services:
       BOTXON_GATEWAY_URL: ${BOTXON_GATEWAY_URL:-https://botxon.chat}
       BOTXON_GATEWAY_KEY: ${BOTXON_GATEWAY_KEY:-}
       BOTXON_WEBHOOK_SECRET: ${BOTXON_WEBHOOK_SECRET:-}
-      # Legacy Wire gateway (unused by checkout).
-      WIRE_SECRET_KEY: ${WIRE_SECRET_KEY:-}
-      WIRE_WEBHOOK_SECRET: ${WIRE_WEBHOOK_SECRET:-}
       # Email (Resend).
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-NARAN <onboarding@resend.dev>}

@@ -6,7 +6,7 @@ import cors from "cors";
 import helmet from "helmet";
 import productsRouter from "./routes/products.js";
 import authRouter from "./routes/auth.js";
-import paymentsRouter, { wireWebhook, botxonWebhook } from "./routes/payments.js";
+import paymentsRouter, { botxonWebhook } from "./routes/payments.js";
 import { rateLimit } from "./lib/rate-limit.js";
 
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -36,7 +36,6 @@ app.use(cors({ origin: webOrigins && webOrigins.length ? webOrigins : true, cred
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
 // Payment webhooks need the RAW body for signature verification — mount BEFORE json.
-app.post("/api/webhooks/wire", express.raw({ type: "*/*" }), wireWebhook);
 app.post("/api/webhooks/botxon", express.raw({ type: "*/*" }), botxonWebhook);
 
 app.use(express.json({ limit: "1mb" }));
