@@ -101,6 +101,14 @@ services:
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - meilidata:/meili_data
+    # Medusa decides once at boot whether search is on; make it wait until
+    # Meilisearch actually answers so indexing isn't silently disabled.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
     mem_limit: 512m
     networks: [naran]
 
@@ -129,7 +137,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      meilisearch: { condition: service_started }
+      meilisearch: { condition: service_healthy }
       medusa-migrate: { condition: service_completed_successfully }
     environment:
       <<: *medusa-env
@@ -153,6 +161,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      meilisearch: { condition: service_healthy }
       medusa-migrate: { condition: service_completed_successfully }
     environment:
       <<: *medusa-env
@@ -245,7 +254,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
-    mem_limit: 512m
+    # sharp (image optimization) needs headroom beyond Next itself.
+    mem_limit: 768m
     expose:
       - "3000"
     networks: [naran]

@@ -39,6 +39,7 @@ export async function sendShippedEmail(o: ShippedEmail): Promise<void> {
   }
   try {
     const res = await fetch("https://api.resend.com/emails", {
+      signal: AbortSignal.timeout(10_000), // never hang a subscriber on Resend
       method: "POST",
       headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ from: FROM, to: o.email, subject: `NARAN захиалга ${o.id} хүргэлтэд гарлаа`, html }),
@@ -90,6 +91,7 @@ export async function sendPasswordResetEmail(o: PasswordResetEmail): Promise<voi
   }
   try {
     const res = await fetch("https://api.resend.com/emails", {
+      signal: AbortSignal.timeout(10_000), // never hang a subscriber on Resend
       method: "POST",
       headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ from: FROM, to: o.email, subject: "NARAN — нууц үг сэргээх", html }),

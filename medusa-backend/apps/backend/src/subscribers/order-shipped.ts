@@ -16,11 +16,14 @@ export default async function orderShippedHandler({
   // a filterable query path, but the fulfillment → order link is).
   const { data: fulfillments } = await query.graph({
     entity: "fulfillment",
-    fields: ["id", "order.id", "order.display_id", "order.email"],
+    fields: ["id", "order.id", "order.display_id", "order.email", "order.metadata"],
     filters: { id: data.id },
   });
 
   const linked = (fulfillments?.[0] as any)?.order;
+  // In-store (offline) sales are handed over on the spot — no "shipped" email
+  // (their address is a placeholder, and bounces hurt sender reputation).
+  if ((linked as any)?.metadata?.offline) return;
   if (!linked?.email) {
     console.log(`[shipped] could not resolve order for fulfillment ${data.id}`);
     return;

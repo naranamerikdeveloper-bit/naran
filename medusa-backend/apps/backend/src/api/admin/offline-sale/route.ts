@@ -131,9 +131,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     // consumes the reservation, which is what decrements managed stock).
     // Best-effort/idempotent.
     let fulfilled = false;
+    let reserved = false;
     try {
       if (orderId) {
         await reserveOrderItems(req.scope, orderId);
+        reserved = true;
         const f = await fulfillOrder(req.scope, orderId);
         if (f.fulfilled) {
           await shipOrder(req.scope, orderId);
@@ -144,10 +146,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     } catch { /* order recorded + paid; fulfillment left as-is */ }
 
     // Stock: when fulfillment completed it already decremented managed items via
-    // the reservation. Only fall back to a manual decrement when it did NOT, so
-    // stock is never reduced twice. Unmanaged variants are unlimited (skipped).
+    // the reservation. If the items were reserved but fulfillment failed, the
+    // reservation already holds the stock (staff can finish fulfilling in the
+    // admin) — decrementing too would count the sale twice. Only when nothing
+    // was reserved do we fall back to a manual decrement.
     let stockAdjusted = 0;
-    if (!fulfilled) {
+    if (!fulfilled && !reserved) {
       try {
         const r = await decrementStockForVariants(req.scope, items.map((i) => ({ variant_id: i.variant_id, quantity: i.quantity })));
         stockAdjusted = r.adjusted;
