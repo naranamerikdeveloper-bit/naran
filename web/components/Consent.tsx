@@ -54,8 +54,8 @@ export function Consent() {
             <Link href="/privacy" className="underline hover:text-ink">{t("foot.privacy")}</Link>
           </p>
           <div className="flex gap-2.5 mt-4">
-            <button onClick={() => decide("accepted")} className="btn btn-primary flex-1 justify-center text-sm">{t("cookie.accept")}</button>
-            <button onClick={() => decide("declined")} className="btn btn-outline flex-1 justify-center text-sm">{t("cookie.decline")}</button>
+            <button onClick={() => decide("accepted")} className="btn btn-primary flex-1 min-w-0 justify-center h-11 px-3 text-[12px] whitespace-normal leading-tight">{t("cookie.accept")}</button>
+            <button onClick={() => decide("declined")} className="btn btn-outline flex-1 min-w-0 justify-center h-11 px-3 text-[12px] whitespace-normal leading-tight text-center">{t("cookie.decline")}</button>
           </div>
         </div>
       )}

@@ -62,7 +62,9 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   };
   const catTiles = TILES
     .map(c => ({ ...c, n: countOf(c.kind, c.key) }))
-    .filter(c => c.n > 0)
+    // A tile needs a few products to be worth a click (a 1-item "Body care"
+    // tile looked empty); smaller categories stay reachable from the shop.
+    .filter(c => c.n >= 3)
     .slice(0, 3)
     .map(c => ({ label: t(c.label), sub: `${c.n} ${t("home.items")}`, href: c.href, img: picOf(c.kind, c.key) }));
 

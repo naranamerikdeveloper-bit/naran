@@ -25,59 +25,74 @@ const PhoneIcon = (p: any) => (
   </svg>
 );
 
+const PinIcon = (p: any) => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" />
+  </svg>
+);
+
+// Four columns on desktop (brand · links · categories · contact), stacked on
+// phones — shown on every screen size so terms/returns are reachable on mobile.
 export function Footer() {
   const t = useT();
   return (
-    <footer className="relative z-10 hidden lg:block mx-3 mb-3 overflow-hidden rounded-[1.75rem] border border-line bg-white px-6 pt-12 pb-7 text-ink shadow-[0_24px_60px_-40px_rgba(211,90,76,.35)] sm:mx-4 sm:rounded-[2.25rem] sm:px-10 lg:mx-5">
+    <footer className="relative z-10 mx-3 mb-3 overflow-hidden rounded-[1.75rem] border border-line bg-white px-6 pt-10 sm:pt-12 pb-7 text-ink shadow-[0_24px_60px_-40px_rgba(211,90,76,.35)] sm:mx-4 sm:rounded-[2.25rem] sm:px-10 lg:mx-5">
       {/* faint warm corner bloom */}
       <div className="pointer-events-none absolute -top-24 right-[8%] h-56 w-56 rounded-full bg-accent/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-[1180px]">
-        <div className="flex flex-col gap-10 md:flex-row md:justify-between md:gap-12">
-          {/* Brand */}
-          <div className="flex flex-col items-center text-center md:items-start md:max-w-xs md:text-left">
-            <Logo variant="full" className="h-24"/>
-            <p className="mt-5 text-sm leading-relaxed text-muted">{t("foot.tagline")}</p>
-
-            <div className="mt-5 flex flex-col items-center gap-2 md:items-start">
-              <a href="tel:+97677000329" className="inline-flex items-center gap-2 text-sm text-ink/70 hover:text-accent transition-colors">
-                <PhoneIcon className="text-accent" /> {t("foot.phone")}
-              </a>
-              <a href="mailto:support@naran.mn" className="inline-flex items-center gap-2 text-sm text-ink/70 hover:text-accent transition-colors">
-                <MailIcon className="text-accent" /> support@naran.mn
-              </a>
-            </div>
-
-            <div className="mt-6 flex gap-2.5">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-[1.35fr_.8fr_.9fr_1.5fr] md:gap-10">
+          {/* 1. Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <Logo variant="full" className="h-20 sm:h-24"/>
+            <p className="mt-5 text-[13.5px] leading-relaxed text-muted max-w-sm">{t("foot.tagline")}</p>
+            <div className="mt-5 flex gap-2.5">
               <Social href="https://instagram.com" label="Instagram"><IgIcon /></Social>
               <Social href="https://facebook.com" label="Facebook"><FbIcon /></Social>
             </div>
           </div>
 
-          {/* Nav — only real destinations (placeholder About/Stores/Journal/FAQ removed). */}
-          <nav className="grid w-full grid-cols-2 gap-8 text-center md:w-auto md:text-left">
-            <FootCol title={t("foot.shop")} links={[["/shop?category=Fragrance",t("cat.Fragrance")],["/shop?category=Skincare",t("cat.Skincare")],["/shop?category=Makeup",t("cat.Makeup")],["/shop?category=Gift",t("cat.Gift")]]}/>
-            <FootCol title={t("foot.support")} links={[["/shop",t("bc.shop")],["/refund-policy",t("foot.refund")],["/terms",t("foot.terms")],["/privacy",t("foot.privacy")]]}/>
-          </nav>
-        </div>
+          {/* 2. Links */}
+          <FootCol title={t("foot.links")} links={[["/", t("foot.home")], ["/shop", t("bc.shop")], ["/cart", t("foot.myCart")], ["/account", t("foot.account")]]}/>
 
-        {/* Payment */}
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-2 border-t border-line pt-6 md:justify-start">
-          <span className="mr-1 text-[11px] uppercase tracking-[.2em] text-subtle">{t("foot.payments")}</span>
-          {["QPay", "Хаан банк", "TDB", "Голомт", "Most Money"].map((m) => (
-            <span key={m} className="rounded-full border border-line bg-surface-2 px-3 py-1 text-[12px] text-ink/70">{m}</span>
-          ))}
+          {/* 3. Categories — only ones the store actually carries */}
+          <FootCol title={t("foot.categories")} links={[["/shop?category=Fragrance", t("cat.Fragrance")], ["/shop?type=EDP", t("nav.edp")], ["/shop?type=EDT", t("nav.edt")], ["/shop?filter=new", t("home.newArrivals")]]}/>
+
+          {/* 4. Contact */}
+          <div className="col-span-2 md:col-span-1">
+            <h5 className="mb-4 text-[11px] font-semibold uppercase tracking-[.2em] text-accent">{t("foot.contact")}</h5>
+            <ul className="space-y-3 text-[13.5px] text-ink/75">
+              <li>
+                <a href="tel:+97698824848" className="inline-flex items-center gap-2.5 hover:text-accent transition-colors">
+                  <PhoneIcon className="text-accent shrink-0" /> {t("foot.phone")}
+                </a>
+              </li>
+              <li>
+                <a href="mailto:info@naranamerikbaraa.mn" className="inline-flex items-center gap-2.5 hover:text-accent transition-colors break-all">
+                  <MailIcon className="text-accent shrink-0" /> info@naranamerikbaraa.mn
+                </a>
+              </li>
+              {["foot.addr1", "foot.addr2"].map(k => (
+                <li key={k} className="flex items-start gap-2.5 leading-relaxed">
+                  <PinIcon className="text-accent shrink-0 mt-[3px]" /> <span>{t(k)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["QPay", "SocialPay"].map(m => (
+                <span key={m} className="rounded-full border border-accent/25 bg-accent-soft/50 px-3 py-1 text-[11.5px] font-semibold text-accent-deep">{m}</span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Bottom */}
-        <div className="mt-6 flex flex-col-reverse items-center gap-3 text-[13px] text-muted sm:flex-row sm:justify-between">
-          <span>{t("foot.rights")}</span>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-            <Link href="/privacy" className="hover:text-accent transition-colors">{t("foot.privacy")}</Link>
+        <div className="mt-10 flex flex-col-reverse items-center gap-3 border-t border-line pt-6 text-[12.5px] text-muted md:flex-row md:justify-between">
+          <span className="text-center">{t("foot.rights")}</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
             <Link href="/terms" className="hover:text-accent transition-colors">{t("foot.terms")}</Link>
-            <Link href="/refund-policy" className="hover:text-accent transition-colors">{t("foot.refund")}</Link>
-            <span className="hidden sm:inline text-line">·</span>
-            <span className="text-[11px] uppercase tracking-[.15em] text-accent">{t("foot.slogan")}</span>
+            <Link href="/privacy" className="hover:text-accent transition-colors">{t("foot.privacy")}</Link>
+            <Link href="/refund-policy" className="hover:text-accent transition-colors">{t("foot.delivery")}</Link>
           </div>
         </div>
       </div>
