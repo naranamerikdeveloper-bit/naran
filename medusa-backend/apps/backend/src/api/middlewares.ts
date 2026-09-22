@@ -74,6 +74,32 @@ const guardRoleChange = (req: MedusaRequest, res: MedusaResponse, next: MedusaNe
   next();
 };
 
+// Admin uploads (product photos, CMS banners): cap the request size and require
+// an image-managing role. Core /admin/uploads buffers files in memory with no
+// limit and lets any admin upload. Files are served from the R2 bucket's own
+// origin, not the admin's, so a stray file can't script the admin.
+const UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
+async function guardUpload(req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) {
+  const len = Number(req.headers["content-length"] || 0);
+  if (!len || len > UPLOAD_MAX_BYTES) {
+    res.status(413).json({ message: "Файл хэт том байна (дээд тал нь 30MB)" });
+    return;
+  }
+  const userId = (req as any).auth_context?.actor_id;
+  if (!userId) { res.status(401).json({ message: "Not authenticated" }); return; }
+  try {
+    const user: any = await req.scope.resolve(Modules.USER).retrieveUser(userId, { select: ["id", "email", "metadata"] as any });
+    const actor = { role: user?.metadata?.role, email: user?.email };
+    if (!canActor(actor, "catalog.write") && !canActor(actor, "content.write")) {
+      res.status(403).json({ message: "Эрх хүрэлцэхгүй (catalog.write / content.write)" });
+      return;
+    }
+    next();
+  } catch (e) {
+    next(e as Error);
+  }
+}
+
 export default defineMiddlewares({
   routes: [
     // --- Auth rate limiting (login / register / password reset), both actor types ---
@@ -107,6 +133,9 @@ export default defineMiddlewares({
     { matcher: "/admin/invites/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/api-keys", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/api-keys/*", methods: ["POST", "DELETE"], middlewares: [requirePermission("team.manage")] },
+
+    // --- Admin file uploads ---
+    { matcher: "/admin/uploads", methods: ["POST"], middlewares: [guardUpload] },
 
     // --- Payment safety: carts become orders only via the payments gateway ---
     { matcher: "/store/carts/:id/complete", methods: ["POST"], middlewares: [internalOnly] },

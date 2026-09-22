@@ -80,7 +80,8 @@ services:
   redis:
     image: redis:7-alpine
     <<: *restart
-    command: ["redis-server", "--appendonly", "yes"]
+    # Bounded memory; never evict (it holds the event bus and payment records).
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "200mb", "--maxmemory-policy", "noeviction"]
     volumes:
       - redisdata:/data
     healthcheck:
@@ -166,7 +167,10 @@ services:
     <<: *restart
     depends_on:
       medusa: { condition: service_started }
+      redis: { condition: service_healthy }
     environment:
+      # Durable payment records + background reconciliation (lib/store).
+      REDIS_URL: redis://redis:6379
       NODE_ENV: production
       PORT: "4000"
       JWT_SECRET: ${JWT_SECRET}

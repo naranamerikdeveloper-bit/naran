@@ -69,20 +69,31 @@ export async function writeHomepage(scope: { resolve: (k: any) => any }, content
 }
 
 // Normalize/validate an incoming payload into a safe HomepageContent.
+// Links: only in-site paths or https URLs (no javascript:/data: — they would
+// run script for every shopper who clicks the banner). Images: https only.
+const safeHref = (v: any): string => {
+  const h = String(v ?? "").trim();
+  return /^\/(?!\/)/.test(h) || /^https:\/\//i.test(h) ? h.slice(0, 500) : "/shop";
+};
+const safeImg = (v: any): string => {
+  const u = String(v ?? "").trim();
+  return /^https:\/\//i.test(u) || /^\/(?!\/)/.test(u) ? u.slice(0, 1000) : "";
+};
+
 export function sanitize(input: any): HomepageContent {
   const base = emptyHomepage();
   const b = (v: any): Bi => bi(String(v?.mn ?? ""), String(v?.en ?? ""));
   const hero: HeroSlide[] = Array.isArray(input?.hero)
     ? input.hero.slice(0, 8).map((s: any) => ({
         kicker: b(s?.kicker), top: b(s?.top), accent: b(s?.accent), desc: b(s?.desc),
-        img: String(s?.img || ""), href: String(s?.href || "/shop"),
+        img: safeImg(s?.img), href: safeHref(s?.href),
       }))
     : base.hero;
   const p = input?.promo || {};
   const promo: Promo = {
     enabled: !!p.enabled,
     kicker: b(p.kicker), title: b(p.title), desc: b(p.desc), cta: b(p.cta),
-    href: String(p.href || "/shop"), img: String(p.img || ""),
+    href: safeHref(p.href), img: safeImg(p.img),
   };
   return { hero, promo };
 }

@@ -8,6 +8,7 @@ import {
 } from "../lib/botxon.js";
 import { sendOrderConfirmation } from "../lib/email.js";
 import { rateLimit } from "../lib/rate-limit.js";
+import { putRecord, getRecord, pendingIds, dropPending } from "../lib/store.js";
 
 const MEDUSA_URL = process.env.MEDUSA_URL || "http://localhost:9000";
 // No baked-in fallback: a wrong/absent key must fail loudly, not silently use a
@@ -34,6 +35,7 @@ type Record = {
   reported?: boolean;  // guard: alert on an unfulfilled paid order exactly once
   order?: { id: string; total: number; email: string; estimatedDelivery: string; items: OrderItem[] };
   invoice?: BotxonInvoice; // Botxon: QR + bank deeplinks, so the pay page can re-render them
+  createdAt?: number;      // ms epoch — bounds background reconciliation
 };
 
 // How many times we retry completing a paid cart (across poll ticks + webhook)
@@ -145,8 +147,27 @@ function publicOrder(o?: Record["order"]) {
 // reportUnfulfilledPayment, cartStockShortfall and the needs_review flow for its
 // invoice/QR model. Keyed by invoiceId; the order ref IS the cart
 // id, so a cold restart can still complete via getInvoice(orderRef).
+// In-memory cache in front of the durable store (lib/store — Redis). Every
+// write goes through saveInvoice so a restart never loses a payment record.
 const invoices = new Map<string, Record>();
 const botxonInFlight = new Map<string, Promise<Record | null>>();
+
+// Still worth a background re-check with Botxon (money may land later).
+const isOpen = (r: Record) =>
+  r.status === "pending" || (r.status === "needs_review" && (r.attempts ?? 0) < MAX_SETTLE_ATTEMPTS);
+
+function saveInvoice(id: string, rec: Record) {
+  invoices.set(id, rec);
+  void putRecord(id, rec, isOpen(rec));
+}
+
+async function loadInvoice(id: string): Promise<Record | undefined> {
+  const hit = invoices.get(id);
+  if (hit) return hit;
+  const stored = await getRecord<Record>(id);
+  if (stored) invoices.set(id, stored);
+  return stored ?? undefined;
+}
 
 function settleBotxon(invoiceId: string): Promise<Record | null> {
   const cached = invoices.get(invoiceId);
@@ -159,7 +180,7 @@ function settleBotxon(invoiceId: string): Promise<Record | null> {
 }
 
 async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
-  const cached = invoices.get(invoiceId);
+  const cached = await loadInvoice(invoiceId);
   if (cached?.status === "paid") return cached;
 
   // Botxon is the source of truth — re-check even when a webhook triggered us.
@@ -171,8 +192,8 @@ async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
     cached ?? { cartId, amount: Math.round(inv.amount || 0), email: "", shippingMethod: "standard", status: "pending", attempts: 0 };
 
   // Terminal failure from the gateway → stop polling, no order.
-  if (inv.status === "failed") { rec.status = "failed"; invoices.set(invoiceId, rec); return rec; }
-  if (inv.status !== "paid") { invoices.set(invoiceId, rec); return rec; }
+  if (inv.status === "failed") { rec.status = "failed"; saveInvoice(invoiceId, rec); return rec; }
+  if (inv.status !== "paid") { saveInvoice(invoiceId, rec); return rec; }
   if (rec.status === "paid") return rec;
 
   // Money is in. Turn the cart into a Medusa order (idempotent); on persistent
@@ -204,7 +225,7 @@ async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
     if (rec.attempts >= MAX_SETTLE_ATTEMPTS) reportUnfulfilledPayment(invoiceId, rec, e);
     else console.error(`[botxon] completion attempt ${rec.attempts}/${MAX_SETTLE_ATTEMPTS} failed for cart ${cartId}: ${e.message}`);
   }
-  invoices.set(invoiceId, rec);
+  saveInvoice(invoiceId, rec);
   return rec;
 }
 
@@ -226,7 +247,7 @@ const botxonInvoiceSchema = z.object({
 router.post("/botxon/invoice", intentCreateLimit, async (req, res) => {
   const parsed = botxonInvoiceSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { cartId, email, shippingMethod, description } = parsed.data;
+  const { cartId, email, shippingMethod } = parsed.data;
   try {
     // Stock guard (B3): never invoice for a cart we can't fulfil.
     const short = await cartStockShortfall(cartId);
@@ -242,10 +263,10 @@ router.post("/botxon/invoice", intentCreateLimit, async (req, res) => {
     // — omit it rather than send a wrongly-shaped value. orderRef (the cart id)
     // already links the payment back to the order (which carries the email).
     const invoice = await botxonCreateInvoice({
-      amount, description: description || `NARAN order ${cartId}`,
+      amount, description: `NARAN захиалга ${cartId.slice(-8)}` /* fixed text: shown on the QPay invoice */,
       orderRef: cartId,
     });
-    invoices.set(invoice.invoiceId, { cartId, amount, email, shippingMethod, status: "pending", attempts: 0, invoice });
+    saveInvoice(invoice.invoiceId, { cartId, amount, email, shippingMethod, status: "pending", attempts: 0, invoice, createdAt: Date.now() });
     res.json({ data: {
       invoiceId: invoice.invoiceId, qrText: invoice.qrText, qrImage: invoice.qrImage,
       shortUrl: invoice.shortUrl, urls: invoice.urls, live: BOTXON_LIVE,
@@ -256,7 +277,10 @@ router.post("/botxon/invoice", intentCreateLimit, async (req, res) => {
   }
 });
 
-router.get("/botxon/invoice", async (req, res) => {
+// The pay page polls every 3–6 s; 60/min per client leaves room for a few tabs
+// while stopping the poll from being used to hammer the gateway.
+const statusLimit = rateLimit({ name: "pay-status", windowMs: 60_000, max: 60 });
+router.get("/botxon/invoice", statusLimit, async (req, res) => {
   const id = req.query.id as string;
   if (!id) return res.status(400).json({ error: "id required" });
   try {
@@ -273,13 +297,31 @@ router.get("/botxon/invoice", async (req, res) => {
     // A transient gateway error must not end the customer's payment session:
     // for an invoice we issued, keep reporting "pending" so the QR stays up and
     // the next poll (or the webhook) can still settle it.
-    const known = invoices.get(id);
+    const known = await loadInvoice(id);
     if (known && known.status !== "failed") {
       return res.json({ data: { status: "pending", order: null, invoice: known.invoice ?? null } });
     }
     res.status(502).json({ error: "Could not verify payment" });
   }
 });
+
+// Background reconciliation: every minute, re-check open invoices with Botxon.
+// Completes orders whose money arrived while nobody was polling (tab closed,
+// webhook missed, api restarted). Invoices older than 3 h drop out of the set.
+const RECONCILE_MS = 60_000;
+const RECONCILE_MAX_AGE_MS = 3 * 60 * 60_000;
+if (BOTXON_LIVE) {
+  setInterval(async () => {
+    for (const id of await pendingIds()) {
+      const rec = await loadInvoice(id);
+      if (!rec || !isOpen(rec) || Date.now() - (rec.createdAt ?? 0) > RECONCILE_MAX_AGE_MS) {
+        await dropPending(id);
+        continue;
+      }
+      try { await settleBotxon(id); } catch (e: any) { console.error(`[reconcile] ${id}: ${e.message}`); }
+    }
+  }, RECONCILE_MS).unref();
+}
 
 export default router;
 
@@ -299,17 +341,19 @@ export async function botxonWebhook(req: Request, res: Response) {
   }
   let event: any;
   try { event = JSON.parse(rawBody); } catch { return res.json({ received: true }); }
-  if (event?.event === "invoice.paid" && event?.invoiceId) {
+  // Botxon names the invoice id "id" in its API responses; accept either.
+  const eventInvoiceId: string | undefined = event?.invoiceId ?? event?.invoice_id ?? event?.id ?? event?.data?.id;
+  if (event?.event === "invoice.paid" && eventInvoiceId) {
     // Defense in depth: the webhook's amount must match what we invoiced. Don't
     // settle a mismatched amount — leave it to the status poll / manual review.
     // (settleBotxon re-verifies against the completed order total regardless.)
-    const rec = invoices.get(event.invoiceId);
+    const rec = await loadInvoice(eventInvoiceId);
     if (rec && typeof event.amount === "number" && Math.round(event.amount) !== rec.amount) {
-      console.error(`[botxon] webhook amount mismatch invoice=${event.invoiceId} webhook=${event.amount} expected=${rec.amount}`);
-      try { Sentry.captureMessage(`Botxon webhook amount mismatch invoice ${event.invoiceId}`, "warning"); } catch { /* no DSN */ }
+      console.error(`[botxon] webhook amount mismatch invoice=${eventInvoiceId} webhook=${event.amount} expected=${rec.amount}`);
+      try { Sentry.captureMessage(`Botxon webhook amount mismatch invoice ${eventInvoiceId}`, "warning"); } catch { /* no DSN */ }
       return res.json({ received: true });
     }
-    try { await settleBotxon(event.invoiceId); } catch (e: any) { console.error("botxon webhook settle:", e.message); }
+    try { await settleBotxon(eventInvoiceId); } catch (e: any) { console.error("botxon webhook settle:", e.message); }
   }
   res.json({ received: true });
 }
