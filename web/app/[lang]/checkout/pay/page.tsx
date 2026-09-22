@@ -8,6 +8,20 @@ import { useT, useLang } from "@/components/LangProvider";
 import { money } from "@/lib/api";
 
 const PAY_WINDOW_MS = 30 * 60_000;
+// The window is fixed per invoice (kept in sessionStorage) so a refresh doesn't
+// grant a fresh 30 minutes.
+function deadlineFor(inv: string | null): number {
+  const key = `botxon_deadline_${inv}`;
+  try {
+    const saved = Number(sessionStorage.getItem(key));
+    if (saved > 0) return saved;
+    const end = Date.now() + PAY_WINDOW_MS;
+    sessionStorage.setItem(key, String(end));
+    return end;
+  } catch {
+    return Date.now() + PAY_WINDOW_MS;
+  }
+}
 import { botxon, type BotxonBankUrl } from "@/lib/botxon";
 
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
@@ -47,7 +61,7 @@ function Pay() {
   // Remaining time on the payment window, shown under the QR.
   const [left, setLeft] = useState(PAY_WINDOW_MS);
   useEffect(() => {
-    const end = Date.now() + PAY_WINDOW_MS;
+    const end = deadlineFor(inv);
     const id = setInterval(() => setLeft(Math.max(0, end - Date.now())), 1000);
     return () => clearInterval(id);
   }, []);
@@ -69,7 +83,7 @@ function Pay() {
     if (!inv) return;
     // The shopper gets ~30 minutes to pay. Polling is every 3 s for the first
     // 5 minutes, then every 6 s; transient errors never end the session early.
-    const started = Date.now();
+    const end = deadlineFor(inv);
     let errors = 0;
     const tick = async () => {
       if (done.current) return;
@@ -108,9 +122,9 @@ function Pay() {
       } catch {
         errors++;
       }
-      const elapsed = Date.now() - started;
-      if (elapsed > PAY_WINDOW_MS) { setError(t("proc.timeout")); return; }
-      setTimeout(tick, elapsed < 5 * 60_000 ? 3000 : errors > 5 ? 10_000 : 6000);
+      const remaining = end - Date.now();
+      if (remaining <= 0) { setError(t("proc.timeout")); return; }
+      setTimeout(tick, PAY_WINDOW_MS - remaining < 5 * 60_000 ? 3000 : errors > 5 ? 10_000 : 6000);
     };
     tick();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -166,7 +180,7 @@ function Pay() {
               <div className="w-full aspect-square rounded-lg bg-surface-2 grid place-items-center mb-2">
                 <span className="w-9 h-9 rounded-full border-3 border-accent/30 border-t-accent animate-spin" style={{ borderWidth: 3 }} />
               </div>
-              <p className="tiny text-muted">{t("pay.mockNote")}</p>
+              <p className="tiny text-muted">{invoice && (invoice as any).live === false ? t("pay.mockNote") : t("pay.loadingQr")}</p>
             </div>
           )}
         </div>

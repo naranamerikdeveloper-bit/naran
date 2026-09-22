@@ -15,7 +15,7 @@ const REGION = process.env.NEXT_PUBLIC_MEDUSA_REGION || "reg_01M0T6Q2HE0A9R8MHXT
 // (typo-tolerant, fast at 10k+). Falls back to Medusa's built-in `q` on any error.
 const MEILI_ENABLED = (process.env.NEXT_PUBLIC_MEILISEARCH ?? "") === "1";
 
-const FIELDS = "id,title,subtitle,handle,description,thumbnail,metadata,created_at,*categories,*images,*options,*options.values,*variants,*variants.calculated_price,*variants.manage_inventory,*variants.inventory_items.inventory.location_levels.available_quantity";
+const FIELDS = "id,title,subtitle,handle,description,thumbnail,metadata,created_at,*categories,*images,*options,*options.values,*variants,*variants.options,*variants.calculated_price,*variants.manage_inventory,*variants.inventory_items.inventory.location_levels.available_quantity";
 const H = { "content-type": "application/json", "x-publishable-api-key": PK };
 
 // `revalidate` (seconds) makes the fetch cacheable → the calling page can render
@@ -59,6 +59,17 @@ async function authPost(path: string, body: any) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Auth ${res.status}`);
   return data;
+}
+async function createCustomer(token: string, d: { email: string; firstName: string; lastName: string }) {
+  const res = await fetch(`${URL}/store/customers`, {
+    method: "POST",
+    headers: { ...H, authorization: `Bearer ${token}` },
+    body: JSON.stringify({ email: d.email, first_name: d.firstName, last_name: d.lastName }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.message || "Бүртгэл үүсгэж чадсангүй. Дахин оролдоно уу.");
+  }
 }
 async function fetchMe(token: string): Promise<User> {
   const res = await fetch(`${URL}/store/customers/me`, { headers: { ...H, authorization: `Bearer ${token}` } });
@@ -141,7 +152,11 @@ function map(m: any): Product {
   };
   const variants = (m.variants || []).map((v: any) => {
     const amt = v?.calculated_price?.calculated_amount;
-    return { id: v.id, size: v.title, stock: variantStock(v), price: typeof amt === "number" ? Math.round(amt) : undefined };
+    // Match on the variant's value for the size option (what the size buttons
+    // show), not its title — titles can differ ("50ml" vs "Chance 50ml"), and a
+    // mismatch picked the wrong variant, price and stock.
+    const size = (sizeOpt && (v.options || []).find((o: any) => o.option_id === sizeOpt.id)?.value) || v.title;
+    return { id: v.id, size, stock: variantStock(v), price: typeof amt === "number" ? Math.round(amt) : undefined };
   });
   const stock = variants.reduce((a: number, v: any) => a + v.stock, 0);
   // Real gallery images: thumbnail first, then any product images (de-duped).
@@ -329,17 +344,22 @@ export const medusa = {
     login: async (email: string, password: string) => {
       const { token } = await authPost("/auth/customer/emailpass", { email, password });
       if (!token) throw new Error("Invalid credentials");
-      return { token, user: await fetchMe(token) };
+      try {
+        return { token, user: await fetchMe(token) };
+      } catch {
+        // Login identity exists but its customer record was never created (a
+        // signup that failed half-way). Create it now instead of leaving the
+        // account unusable, then log in again for a customer-bound token.
+        await createCustomer(token, { email, firstName: email.split("@")[0], lastName: "" });
+        const again = await authPost("/auth/customer/emailpass", { email, password });
+        return { token: again.token, user: await fetchMe(again.token) };
+      }
     },
     signup: async (data: { firstName: string; lastName: string; email: string; password: string }) => {
       const reg = await authPost("/auth/customer/emailpass/register", { email: data.email, password: data.password });
       const regToken = reg.token;
       if (!regToken) throw new Error("Could not register");
-      await fetch(`${URL}/store/customers`, {
-        method: "POST",
-        headers: { ...H, authorization: `Bearer ${regToken}` },
-        body: JSON.stringify({ email: data.email, first_name: data.firstName, last_name: data.lastName }),
-      });
+      await createCustomer(regToken, data);
       const { token } = await authPost("/auth/customer/emailpass", { email: data.email, password: data.password });
       return { token, user: await fetchMe(token) };
     },
@@ -420,6 +440,16 @@ export const medusa = {
 
   // Real shipping options for the given items, priced by Medusa (single source
   // of truth — the checkout renders these instead of hardcoded methods/prices).
+  // Just the given products (by handle = storefront id) — for the wishlist,
+  // instead of downloading the whole catalog in the browser.
+  byIds: async (ids: string[]): Promise<Product[]> => {
+    if (!ids.length) return [];
+    const p = new URLSearchParams({ limit: String(Math.min(ids.length, 100)), region_id: REGION, fields: FIELDS });
+    for (const id of ids.slice(0, 100)) p.append("handle[]", id);
+    const res = await mfetch(`products?${p.toString()}`);
+    return (res.products || []).map(map);
+  },
+
   // Live search suggestions for the header dropdown: visible products only.
   suggest: async (q: string): Promise<{ items: Product[]; total: number }> => {
     const all = (await searchProducts(q)).filter(p => !!p.image);
@@ -432,19 +462,8 @@ export const medusa = {
     return { optionId: d.option_id ?? null, fee: Math.round(d.fee ?? 0) };
   },
 
-  shippingQuote: async (items: { variantId: string; quantity: number }[]): Promise<{ id: string; name: string; amount: number }[]> => {
-    const { cart } = await mpost("carts", {
-      region_id: REGION,
-      items: items.map(i => ({ variant_id: i.variantId, quantity: i.quantity })),
-    });
-    const { shipping_options } = await mfetch(`shipping-options?cart_id=${cart.id}`);
-    return (shipping_options || [])
-      .map((o: any) => ({ id: o.id, name: o.name as string, amount: Math.round(o.amount ?? 0) }))
-      .sort((a: any, b: any) => a.amount - b.amount);
-  },
-
   // Build a Medusa cart up to (but not including) completion. The order is
-  // completed server-side by the Wire webhook/poll once payment succeeds.
+  // completed server-side by the payments api once Botxon confirms payment.
   prepareCart: async (input: {
     email: string;
     items: { variantId: string; quantity: number }[];
@@ -472,7 +491,14 @@ export const medusa = {
     await mpost(`carts/${cart.id}/shipping-methods`, { option_id: opt.id });
     // Apply coupon after shipping so both item- and shipping-target promos compute.
     if (input.promoCode) {
-      try { await mpost(`carts/${cart.id}/promotions`, { promo_codes: [input.promoCode] }); } catch { /* invalid code → ignore, charge full */ }
+      // Never silently drop a code the shopper saw applied — they'd be charged
+      // more than the summary said. Fail loudly so checkout can tell them.
+      let applied = false;
+      try {
+        const res = await mpost(`carts/${cart.id}/promotions`, { promo_codes: [input.promoCode] });
+        applied = (res?.cart?.promotions || []).some((p: any) => (p.code || "").toUpperCase() === input.promoCode!.toUpperCase());
+      } catch { /* handled below */ }
+      if (!applied) throw new Error("Промо код хүчингүй эсвэл хугацаа нь дууссан байна. Кодоо устгаад дахин оролдоно уу.");
     }
     const { payment_collection } = await mpost("payment-collections", { cart_id: cart.id });
     await mpost(`payment-collections/${payment_collection.id}/payment-sessions`, { provider_id: "pp_system_default" });

@@ -22,19 +22,22 @@ export const useCart = create<CartState>()(
         const size = opts.size ?? p.variants?.[0]?.size;
         const variantId = opts.variantId ?? p.variants?.find(v => v.size === size)?.id ?? p.variants?.[0]?.id;
         const key = variantId || p.id;
+        // Never let the bag hold more than is in stock (unmanaged stock → 99).
+        const stock = p.variants?.find(v => v.id === variantId)?.stock;
+        const max = Math.max(1, Math.min(99, stock ?? 99));
         const existing = s.items.find(i => (i.variantId || i.id) === key);
         if (existing) {
-          return { items: s.items.map(i => (i.variantId || i.id) === key ? { ...i, qty: i.qty + qty } : i) };
+          return { items: s.items.map(i => (i.variantId || i.id) === key ? { ...i, max, qty: Math.min(max, i.qty + qty) } : i) };
         }
         // Charge the chosen variant's own price (sizes differ), not the product's
         // lowest "from" price. The server re-prices the cart anyway; this keeps
         // the drawer/checkout subtotal equal to what the QR will ask for.
         const price = p.variants?.find(v => v.id === variantId)?.price ?? p.price;
-        return { items: [...s.items, { id: p.id, name: p.name, price, qty, accent: p.accent, category: p.category, shape: p.shape, image: p.image, size, variantId }] };
+        return { items: [...s.items, { id: p.id, name: p.name, price, qty: Math.min(max, qty), max, accent: p.accent, category: p.category, shape: p.shape, image: p.image, size, variantId }] };
       }),
       remove: key => set(s => ({ items: s.items.filter(i => (i.variantId || i.id) !== key) })),
       setQty: (key, qty) => set(s => ({
-        items: s.items.map(i => (i.variantId || i.id) === key ? { ...i, qty: Math.max(1, qty) } : i),
+        items: s.items.map(i => (i.variantId || i.id) === key ? { ...i, qty: Math.max(1, Math.min(i.max ?? 99, qty)) } : i),
       })),
       clear: () => set({ items: [] }),
       count: () => get().items.reduce((a, b) => a + b.qty, 0),

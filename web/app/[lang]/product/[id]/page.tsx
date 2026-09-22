@@ -31,7 +31,7 @@ export async function generateStaticParams() {
   }
 }
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://naran.mn").replace(/\/$/, "");
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn").replace(/\/$/, "");
 
 // Per-product SEO: title, description, canonical, and Open Graph image.
 export async function generateMetadata({ params }: { params: { lang: string; id: string } }): Promise<Metadata> {
@@ -85,7 +85,9 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
       availability: (product.stock ?? 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       url: `${SITE_URL}/${params.lang}/product/${product.slug}`,
     },
-    ...(product.rating ? { aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating, reviewCount: product.reviews || 1 } } : {}),
+    ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
+    // Only real reviews — never a synthetic count.
+    ...(product.rating && product.reviews > 0 ? { aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating, reviewCount: product.reviews } } : {}),
   };
 
   // Breadcrumb trail for rich results (Нүүр › Дэлгүүр › Бараа).
@@ -119,7 +121,7 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
             {/* Side */}
             <div className="bg-white border border-line rounded-[1.5rem] p-6 sm:p-8 shadow-soft h-fit">
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill bg-surface-2 text-[12px] font-medium uppercase tracking-wide">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: product.accent }}/> {product.category}
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: product.accent }}/> {t(`cat.${product.category}`)}
               </span>
               <h1 className="font-display text-[28px] sm:text-[40px] uppercase tracking-[-.02em] leading-[.95] mt-4">{product.name}</h1>
               {/* Only real reviews — no rating row until a product actually has some. */}

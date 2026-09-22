@@ -56,6 +56,7 @@ export type CartItem = {
   image?: string;
   size?: string;
   variantId?: string;
+  max?: number; // stock of this variant when added — caps the quantity
 };
 
 export type User = { id: string; email: string; firstName: string; lastName: string; phone?: string };

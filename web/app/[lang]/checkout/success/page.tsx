@@ -50,7 +50,8 @@ function Success() {
   const params = useSearchParams();
   const id = params.get("id");
   const total = params.get("total");
-  const eta = new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10);
+  // Policy: delivered within 24–48 hours (no per-order date is known yet).
+  const eta = t("ok.etaValue");
 
   return (
     <div

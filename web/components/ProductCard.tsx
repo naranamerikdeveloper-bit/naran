@@ -56,7 +56,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           ) : product.badge && (
             <span className={`absolute top-3 left-3 z-10 text-[10px] uppercase tracking-[.14em] font-semibold px-2.5 h-6 rounded-pill grid place-items-center ${
               product.badge === "New" ? "bg-accent text-white" : "bg-white/90 text-ink"
-            }`}>{product.badge}</span>
+            }`}>{t(`badge.${product.badge}`)}</span>
           )}
 
           {/* wishlist */}
@@ -87,7 +87,17 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
           {/* add to bag */}
           <button
             disabled={soldOut}
-            onClick={(e) => { e.preventDefault(); if (soldOut) return; add(product); flyToCart(e.currentTarget, product.accent); showToast(`${product.name} · ${t("common.addToBag")}`); }}
+            onClick={(e) => {
+              e.preventDefault();
+              if (soldOut) return;
+              // Several sizes at different prices → let the shopper choose in
+              // quick view instead of silently adding the first variant.
+              if ((product.variants?.length ?? 0) > 1) { openQuickView(product); return; }
+              const v = product.variants?.find(x => x.stock > 0) ?? product.variants?.[0];
+              add(product, 1, { size: v?.size, variantId: v?.id });
+              flyToCart(e.currentTarget, product.accent);
+              showToast(`${product.name} · ${t("common.addToBag")}`);
+            }}
             className={`absolute right-3 bottom-3 z-10 w-10 h-10 rounded-full grid place-items-center transition-all duration-200 ease-elegant ${
               soldOut ? "bg-white/40 text-ink/40 cursor-not-allowed" : "bg-accent-deep text-white hover:bg-accent hover:scale-110 active:scale-95 shadow-soft"
             }`}

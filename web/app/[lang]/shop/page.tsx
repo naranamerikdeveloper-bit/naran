@@ -13,14 +13,14 @@ import type { Metadata } from "next";
 // Reads searchParams (filters) → dynamic; product data is still fetch-cached.
 export const dynamic = "force-dynamic";
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://naran.mn").replace(/\/$/, "");
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn").replace(/\/$/, "");
 
 export function generateMetadata({ params }: { params: { lang: Lang } }): Metadata {
   const t = tFor(params.lang);
   const title = `${t("shop.titleAccent")} — NARAN`;
   const description = params.lang === "mn"
-    ? "Дэлхийн 78 брэндийн оригинал үнэртэй ус — Eau de Parfum, Eau de Toilette, бэлгийн багц. QPay-ээр төлнө."
-    : "Original fragrances from 78 houses — Eau de Parfum, Eau de Toilette and gift sets. Pay with QPay.";
+    ? "Дэлхийн шилдэг брэндүүдийн оригинал үнэртэй ус — Eau de Parfum, Eau de Toilette, бэлгийн багц. QPay-ээр төлнө."
+    : "Original fragrances from leading houses — Eau de Parfum, Eau de Toilette and gift sets. Pay with QPay.";
   const url = `${SITE}/${params.lang}/shop`;
   return {
     title,

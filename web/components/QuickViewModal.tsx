@@ -99,14 +99,14 @@ export function QuickViewModal() {
                 fallback={<div className="absolute inset-0 grid place-items-center card-dark"><ProductVisual product={product} size="lg"/></div>}
                 imgClassName="absolute inset-0 w-full h-full object-cover"/>
               {product.badge && (
-                <span className={`absolute top-4 left-4 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-white" : "bg-white text-ink"}`}>{product.badge}</span>
+                <span className={`absolute top-4 left-4 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-white" : "bg-white text-ink"}`}>{t(`badge.${product.badge}`)}</span>
               )}
             </div>
 
             {/* Details */}
             <div className="p-6 sm:p-7">
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill bg-surface-2 text-[12px] font-medium uppercase tracking-wide">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: product.accent }}/> {product.category}
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: product.accent }}/> {t(`cat.${product.category}`)}
               </span>
               <h2 className="font-display text-[26px] sm:text-[30px] uppercase tracking-[-.02em] leading-[.98] mt-3">{product.name}</h2>
 

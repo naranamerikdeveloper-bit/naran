@@ -20,6 +20,16 @@ export function loadDelivery(): Promise<Delivery> {
 
 export function useDelivery(): Delivery | null {
   const [d, setD] = useState<Delivery | null>(null);
-  useEffect(() => { let on = true; loadDelivery().then(v => { if (on) setD(v); }); return () => { on = false; }; }, []);
+  useEffect(() => {
+    let on = true, tries = 0;
+    const run = () => loadDelivery().then(v => {
+      if (!on) return;
+      setD(v);
+      // Transient failure → retry a few times (checkout stays blocked meanwhile).
+      if (!v.optionId && ++tries < 5) setTimeout(run, 2000 * tries);
+    });
+    run();
+    return () => { on = false; };
+  }, []);
   return d;
 }

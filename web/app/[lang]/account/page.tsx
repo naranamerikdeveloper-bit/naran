@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { CountUp } from "@/components/CountUp";
 import { api, money } from "@/lib/api";
 import type { Product } from "@/lib/types";
-import type { CustomerOrder } from "@/lib/medusa";
+import { medusa, type CustomerOrder } from "@/lib/medusa";
 
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
@@ -68,9 +68,13 @@ export default function AccountPage() {
   useEffect(() => {
     if (!hydrated) return;
     if (!user || !token) { router.push(`/${lang}/auth`); return; }
-    api.customers.orders(token).then(r => setOrders(r.data)).catch(() => {});
+    // An expired session used to show an empty order list; send them to sign in.
+    const expired = (e: any) => {
+      if (/unauthori|401|not allowed|could not load/i.test(String(e?.message || ""))) { signOut(); router.push(`/${lang}/auth`); }
+    };
+    api.customers.orders(token).then(r => setOrders(r.data)).catch(expired);
     api.customers.addresses(token).then(r => setAddresses(r.data)).catch(() => {});
-    api.products.list({}).then(r => setAllProducts(r.data)).catch(() => {}).finally(() => setLoadingProducts(false));
+    medusa.byIds(useWish.getState().ids).then(setAllProducts).catch(() => {}).finally(() => setLoadingProducts(false));
   }, [hydrated, user, token, router]);
 
   if (!hydrated) return null;
@@ -313,7 +317,12 @@ function OrderRow({ o, onReturned }: { o: CustomerOrder; onReturned?: () => void
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   // Only fulfilled orders can be returned (Medusa rejects unfulfilled items).
-  const returnable = (o.status === "delivered" || o.status === "shipped") && o.items.some(i => i.id);
+  // Policy: sealed items can be exchanged within 48 h of delivery. Delivery
+  // itself takes up to 48 h, so requests are open for 5 days after ordering;
+  // staff still approve each one.
+  const RETURN_WINDOW_MS = 5 * 24 * 60 * 60_000;
+  const returnable = (o.status === "delivered" || o.status === "shipped") && o.items.some(i => i.id)
+    && Date.now() - new Date(o.createdAt).getTime() < RETURN_WINDOW_MS;
 
   async function submit() {
     const items = o.items.filter(i => sel[i.id]).map(i => ({ id: i.id, quantity: i.quantity }));

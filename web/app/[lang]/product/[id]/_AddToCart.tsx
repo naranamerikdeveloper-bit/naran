@@ -25,13 +25,15 @@ export function AddToCart({ product }: { product: Product }) {
   const hasRange = new Set((product.variants ?? []).map(v => v.price).filter(n => n != null)).size > 1;
   const shownPrice = size ? priceOf(size) : product.price;
   const soldOut = (product.variants?.length ?? 0) > 0 && product.variants!.every(v => v.stock === 0);
+  // Quantity can't exceed what's in stock for the chosen size (unmanaged → 99).
+  const maxQty = Math.max(1, Math.min(99, size ? sizeStock(size) : 99));
 
   function handleAdd(src?: HTMLElement | null, then?: () => void) {
     if (soldOut) { showToast(t("common.soldOut")); return; }
     if (sizable && !size) { showToast(t("toast.selectSize")); return; }
     if (size && sizeStock(size) === 0) { showToast(t("toast.sizeSoldOut")); return; }
     const variantId = product.variants?.find(v => v.size === size)?.id ?? product.variants?.[0]?.id;
-    add(product, qty, { size, variantId });
+    add(product, Math.min(qty, maxQty), { size, variantId });
     flyToCart(src, product.accent);
     // Buy now navigates away; plain add opens the drawer as confirmation.
     if (then) then(); else openCart();
@@ -63,7 +65,7 @@ export function AddToCart({ product }: { product: Product }) {
         <div className="inline-flex items-center bg-white rounded-pill border border-border p-1">
           <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label={t("common.decrease")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2">−</button>
           <span className="px-3.5 font-semibold min-w-[36px] text-center">{qty}</span>
-          <button onClick={() => setQty(q => q + 1)} aria-label={t("common.increase")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2">+</button>
+          <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label={t("common.increase")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
         </div>
       </Group>
 

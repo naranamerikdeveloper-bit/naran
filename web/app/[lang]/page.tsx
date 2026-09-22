@@ -9,7 +9,6 @@ import { ArrowUpRight, ArrowRight } from "@/components/Icons";
 import { api } from "@/lib/api";
 import { medusa } from "@/lib/medusa";
 import { PRODUCT_IMG, HERO_IMG, FILM_IMG, productImg } from "@/lib/images";
-import { NewsletterForm } from "./_components/NewsletterForm";
 import { Reveal } from "./_components/Reveal";
 import { ValueProps } from "./_components/ValueProps";
 import { CategoryRail } from "./_components/CategoryRail";
@@ -96,12 +95,13 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
         img: cms.promo.img || hotImg,
       }
     : {
-        kicker: t("home.promoKicker"), title: t("home.promoTitle"), desc: t("home.promoDesc"),
+        // Live brand count instead of a hard-coded number.
+        kicker: brandTotal ? `${brandTotal} ${t("home.brands")}` : t("home.promoKicker"), title: t("home.promoTitle"), desc: t("home.promoDesc"),
         cta: t("home.promoCta"), href: "/shop", img: hotImg,
       };
 
   // Site-wide structured data (Organization + WebSite with a Sitelinks search box).
-  const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://naran.mn").replace(/\/$/, "");
+  const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn").replace(/\/$/, "");
   const structuredData = [
     { "@context": "https://schema.org", "@type": "Organization", name: "NARAN", url: SITE, logo: `${SITE}/icon.svg` },
     {
@@ -208,24 +208,6 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
         </div>
       </section>
 
-      {/* ===================== NEWSLETTER (tablet/desktop only — too heavy on phones) ===================== */}
-      <section className="hidden md:block pb-16 lg:pb-24">
-        <div className="container">
-          <Reveal blur
-            className="relative overflow-hidden text-ink rounded-[1.75rem] sm:rounded-[2.25rem] p-8 sm:p-14 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center border border-line bg-white shadow-[0_24px_60px_-40px_rgba(211,90,76,.35)]">
-            {/* faint warm corner bloom — matches the footer */}
-            <div className="pointer-events-none absolute -top-24 right-[8%] h-56 w-56 rounded-full bg-accent/10 blur-3xl"/>
-            <div className="relative z-10">
-              <span className="eyebrow text-accent">{t("home.newsKicker")}</span>
-              <h2 className="font-display text-[32px] sm:text-[44px] tracking-tight mt-3 leading-[.95] text-ink">
-                {t("home.newsTitle")}
-              </h2>
-              <p className="text-muted mt-4 max-w-[400px]">{t("home.newsDesc")}</p>
-            </div>
-            <NewsletterForm />
-          </Reveal>
-        </div>
-      </section>
 
       <Footer />
     </>

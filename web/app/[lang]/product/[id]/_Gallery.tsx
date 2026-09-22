@@ -5,6 +5,7 @@ import { Photo } from "@/components/Photo";
 import { ProductVisual } from "@/components/ProductVisual";
 import { ChevronLeft } from "@/components/Icons";
 import type { Product } from "@/lib/types";
+import { useT } from "@/components/LangProvider";
 
 const clamp = (n: number) => Math.min(100, Math.max(0, n));
 const ease: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
@@ -23,6 +24,7 @@ const slideV = {
 // keyboard arrows. The zoom transform lives on an inner layer so it composes
 // with the framer slide on the outer layer.
 export function Gallery({ product, img }: { product: Product; img: string }) {
+  const t = useT();
   const imgs = product.images?.length ? product.images : [img];
   const many = imgs.length > 1;
   const ref = useRef<HTMLDivElement>(null);
@@ -110,7 +112,7 @@ export function Gallery({ product, img }: { product: Product; img: string }) {
         </AnimatePresence>
 
         {product.badge && (
-          <span className={`absolute top-4 left-4 z-10 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-white" : "bg-white text-ink"}`}>{product.badge}</span>
+          <span className={`absolute top-4 left-4 z-10 text-[11px] uppercase tracking-[.14em] font-semibold px-3 h-7 rounded-pill grid place-items-center ${product.badge === "New" ? "bg-accent text-white" : "bg-white text-ink"}`}>{t(`badge.${product.badge}`)}</span>
         )}
 
         {many && (

@@ -81,7 +81,7 @@ export default function CartPage() {
                         <div className="inline-flex items-center bg-surface-2 rounded-pill p-1">
                           <button onClick={() => setQty(it.variantId || it.id, it.qty - 1)} disabled={it.qty <= 1} aria-label={t("common.decrease")} className="w-8 h-8 rounded-full grid place-items-center hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">−</button>
                           <span className="px-3 font-semibold text-sm min-w-[28px] text-center num-tabular">{it.qty}</span>
-                          <button onClick={() => setQty(it.variantId || it.id, it.qty + 1)} aria-label={t("common.increase")} className="w-8 h-8 rounded-full grid place-items-center hover:bg-white">+</button>
+                          <button onClick={() => setQty(it.variantId || it.id, it.qty + 1)} disabled={it.qty >= (it.max ?? 99)} aria-label={t("common.increase")} className="w-8 h-8 rounded-full grid place-items-center hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">+</button>
                         </div>
                         <div className="font-display text-[16px] num-tabular">{money(it.price * it.qty)}</div>
                       </div>

@@ -8,7 +8,7 @@ import { ProductGridSkeleton } from "@/components/ProductCardSkeleton";
 import { HeartIcon, ArrowRight } from "@/components/Icons";
 import { useWish } from "@/lib/store";
 import { useT } from "@/components/LangProvider";
-import { api } from "@/lib/api";
+import { medusa } from "@/lib/medusa";
 import type { Product } from "@/lib/types";
 
 export default function WishlistPage() {
@@ -21,7 +21,8 @@ export default function WishlistPage() {
 
   useEffect(() => {
     setMounted(true);
-    api.products.list({}).then(r => setAll(r.data)).catch(() => {}).finally(() => setLoading(false));
+    medusa.byIds(ids).then(setAll).catch(() => {}).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const wished = all.filter(p => ids.includes(p.id));

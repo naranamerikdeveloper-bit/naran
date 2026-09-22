@@ -102,7 +102,7 @@ export function CartDrawer() {
                           <div className="inline-flex items-center bg-surface-2 rounded-pill p-0.5">
                             <button onClick={() => setQty(key, it.qty - 1)} aria-label={t("common.decrease")} className="w-7 h-7 rounded-full grid place-items-center text-ink/70 hover:bg-white hover:text-ink active:scale-90 transition-all duration-150">−</button>
                             <span className="px-2.5 text-sm font-semibold num-tabular tabular-nums">{it.qty}</span>
-                            <button onClick={() => setQty(key, it.qty + 1)} aria-label={t("common.increase")} className="w-7 h-7 rounded-full grid place-items-center text-ink/70 hover:bg-white hover:text-ink active:scale-90 transition-all duration-150">+</button>
+                            <button onClick={() => setQty(key, it.qty + 1)} disabled={it.qty >= (it.max ?? 99)} aria-label={t("common.increase")} className="w-7 h-7 rounded-full grid place-items-center text-ink/70 hover:bg-white hover:text-ink active:scale-90 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
                           </div>
                           <span className="font-display text-[15px] num-tabular">{money(it.price * it.qty)}</span>
                         </div>

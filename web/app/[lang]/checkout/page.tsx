@@ -42,7 +42,11 @@ export default function CheckoutPage() {
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   const lineItemsFor = () => items.filter(i => i.variantId).map(i => ({ variantId: i.variantId!, quantity: i.qty }));
 
-  const shipping = delivery?.fee ?? 0;
+  // With a coupon, Medusa's shipping total wins (FREESHIP zeroes it).
+  const shipping = promo ? promo.shippingTotal : (delivery?.fee ?? 0);
+  // Payment is blocked until the delivery option is known — otherwise the cart
+  // could be charged a different option than the summary shows.
+  const deliveryReady = !!delivery?.optionId;
   const tax = 0;
   // Effective totals — Medusa's numbers when a coupon is applied, else local.
   const discount = promo ? promo.discountTotal : 0;
@@ -94,6 +98,8 @@ export default function CheckoutPage() {
     if (items.length === 0) return showToast(t("toast.cartEmpty"));
     const lineItems = items.filter(i => i.variantId).map(i => ({ variantId: i.variantId!, quantity: i.qty }));
     if (lineItems.length === 0) return showToast(t("toast.readd"));
+    if (lineItems.length !== items.length) return showToast(t("toast.readd"));
+    if (!deliveryReady) return showToast(t("co.deliveryLoading"));
 
     const fd = new FormData(e.target as HTMLFormElement);
     if (!validate(fd)) {
@@ -127,7 +133,12 @@ export default function CheckoutPage() {
       try { sessionStorage.setItem(`botxon_inv_${invoice.invoiceId}`, JSON.stringify({ ...invoice, amount: cartTotal })); } catch { /* private mode */ }
       router.push(`/${lang}/checkout/pay?inv=${encodeURIComponent(invoice.invoiceId)}`);
     } catch (err: any) {
-      const msg = err.message || t("toast.payFailed");
+      // Medusa inventory/validation errors arrive in English — translate the
+      // common ones so the shopper knows what to do.
+      const raw = String(err?.message || "");
+      const msg = /inventory|stock|quantity/i.test(raw) ? t("co.errStock")
+        : /promo|promotion/i.test(raw) && !/[А-Яа-яӨөҮү]/.test(raw) ? t("co.errPromo")
+        : raw || t("toast.payFailed");
       showToast(msg);
       setFormError(msg);
       setBusy(false);
@@ -208,7 +219,7 @@ export default function CheckoutPage() {
                 <span>{formError}</span>
               </div>
             )}
-            <button disabled={busy} type="submit" className="btn btn-primary w-full justify-center h-[60px] text-base disabled:opacity-60">
+            <button disabled={busy || !deliveryReady} type="submit" className="btn btn-primary w-full justify-center h-[60px] text-base disabled:opacity-60">
               {busy ? (
                 <><span className="w-5 h-5 rounded-full border-2 border-ink/25 border-t-ink animate-spin"/> {t("co.starting")}</>
               ) : (
@@ -263,7 +274,7 @@ export default function CheckoutPage() {
             </div>
             <Row k={t("cart.subtotal")} v={money(subtotal)}/>
             {discount > 0 && <Row k={t("co.discount")} v={`− ${money(discount)}`}/>}
-            <Row k={t("cart.shipping")} v={shipping === 0 ? t("common.free") : money(shipping)}/>
+            <Row k={t("cart.shipping")} v={!delivery && !promo ? "…" : shipping === 0 ? t("common.free") : money(shipping)}/>
             <Row k={t("cart.tax")} v={money(tax)}/>
             <div className="flex justify-between border-t border-border pt-4.5 mt-3 text-[18px] font-semibold">
               <span>{t("cart.total")}</span>

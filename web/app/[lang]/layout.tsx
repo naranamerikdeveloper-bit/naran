@@ -13,12 +13,12 @@ import { Consent } from "@/components/Consent";
 import { LOCALES, isLang, tFor } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://naran.mn"),
-  title: "NARAN — Гоо сайхан, нэг дороос",
-  description: "Дээд зэрэглэлийн үнэртэй ус, арьс арчилгаа, гоо сайхны бараа — нэг дороос. QPay-ээр төлж, хурдан хүргүүлээрэй.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn"),
+  title: "Наран Америк Бараа — 100% оригинал үнэртэй ус",
+  description: "АНУ, Канадаас албан ёсоор ирсэн 100% оригинал үнэртэй ус — Chanel, Dior, Versace, Gucci болон бусад. QPay-ээр төлж, 24–48 цагт хүргүүлээрэй.",
   openGraph: {
-    title: "NARAN — Гоо сайхан, нэг дороос",
-    description: "Дээд зэрэглэлийн үнэртэй ус, арьс арчилгаа, гоо сайхны бараа — нэг дороос.",
+    title: "Наран Америк Бараа — 100% оригинал үнэртэй ус",
+    description: "АНУ, Канадаас албан ёсоор ирсэн 100% оригинал үнэртэй ус — 24–48 цагт хүргэнэ.",
     type: "website",
     siteName: "NARAN",
   },
