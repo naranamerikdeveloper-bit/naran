@@ -33,7 +33,12 @@ const LOGOS: { slug: string; name: string; h: string }[] = [
  * progressive blur at both edges. Slows on hover; each logo links to the shop
  * filtered by that brand.
  */
-export function Marquee({ kicker }: { kicker: string }) {
+export function Marquee({ kicker, carried }: { kicker: string; carried?: string[] }) {
+  // Only brands the store actually stocks right now (a logo must never lead to
+  // an empty shop page). Falls back to the full list if the catalog is unknown.
+  const have = carried?.length ? new Set(carried.map(b => b.toUpperCase())) : null;
+  const logos = have ? LOGOS.filter(l => have.has(l.name.toUpperCase())) : LOGOS;
+  if (logos.length < 4) return null;
   return (
     <div>
       <p className="text-center text-[11px] sm:text-[12px] font-semibold uppercase tracking-[.28em] text-accent mb-7 sm:mb-10">
@@ -41,7 +46,7 @@ export function Marquee({ kicker }: { kicker: string }) {
       </p>
       <div className="relative h-[72px] sm:h-[96px] w-full overflow-hidden">
         <InfiniteSlider className="flex h-full w-full items-center" duration={45} durationOnHover={110} gap={64}>
-          {LOGOS.map(l => (
+          {logos.map(l => (
             <Link key={l.slug} href={`/shop?brand=${encodeURIComponent(l.name)}`}
               aria-label={l.name}
               className="flex h-full min-w-[120px] sm:min-w-[150px] items-center justify-center opacity-55 grayscale transition duration-300 hover:opacity-100 hover:scale-105">
@@ -51,8 +56,8 @@ export function Marquee({ kicker }: { kicker: string }) {
             </Link>
           ))}
         </InfiniteSlider>
-        <ProgressiveBlur className="pointer-events-none absolute top-0 left-0 h-full w-[80px] sm:w-[200px]" direction="left" blurIntensity={1} />
-        <ProgressiveBlur className="pointer-events-none absolute top-0 right-0 h-full w-[80px] sm:w-[200px]" direction="right" blurIntensity={1} />
+        <ProgressiveBlur className="pointer-events-none absolute top-0 left-0 h-full w-[80px] sm:w-[200px]" direction="left" blurIntensity={1} blurLayers={5} />
+        <ProgressiveBlur className="pointer-events-none absolute top-0 right-0 h-full w-[80px] sm:w-[200px]" direction="right" blurIntensity={1} blurLayers={5} />
       </div>
     </div>
   );

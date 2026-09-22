@@ -227,15 +227,15 @@ async function fetchCatalog(categoryId?: string): Promise<Product[]> {
 // Free-text search. Prefers MeiliSearch (typo-tolerant) via the plugin's store
 // endpoint, which hydrates full products (with prices). Any failure — or Meili
 // disabled — falls back to Medusa's built-in `q` search so search never breaks.
-async function searchProducts(q: string): Promise<Product[]> {
+async function searchProducts(q: string, limit = 100, revalidate?: number): Promise<Product[]> {
   if (MEILI_ENABLED) {
     try {
-      const p = new URLSearchParams({ query: q, region_id: REGION, fields: FIELDS, limit: "100" });
-      const res = await mfetch(`meilisearch/products?${p.toString()}`);
+      const p = new URLSearchParams({ query: q, region_id: REGION, fields: FIELDS, limit: String(limit) });
+      const res = await mfetch(`meilisearch/products?${p.toString()}`, 1, revalidate);
       return (res.products || []).map(map);
     } catch { /* fall through to built-in search */ }
   }
-  return (await fetchProducts({ q })).products;
+  return (await fetchProducts({ q, limit, revalidate })).products;
 }
 
 // Resolve storefront Category key → Medusa category id (cached for the session).
@@ -452,7 +452,8 @@ export const medusa = {
 
   // Live search suggestions for the header dropdown: visible products only.
   suggest: async (q: string): Promise<{ items: Product[]; total: number }> => {
-    const all = (await searchProducts(q)).filter(p => !!p.image);
+    // Small, briefly cached lookup — the dropdown shows six.
+    const all = (await searchProducts(q, 24, 60)).filter(p => !!p.image);
     return { items: all.slice(0, 6), total: all.length };
   },
 
@@ -486,8 +487,9 @@ export const medusa = {
     const { shipping_options } = await mfetch(`shipping-options?cart_id=${cart.id}`);
     // The admin-configured delivery option is the only one used (no customer choice).
     const wantId = input.shippingOptionId || (await medusa.delivery().catch(() => ({ optionId: null }))).optionId;
-    const opt = (wantId && shipping_options.find((o: any) => o.id === wantId)) || shipping_options[0];
-    if (!opt) throw new Error("No shipping option available");
+    // Never silently switch to another (possibly priced) option.
+    const opt = wantId ? shipping_options.find((o: any) => o.id === wantId) : shipping_options[0];
+    if (!opt) throw new Error("Хүргэлтийн тохиргоо олдсонгүй. Түр хүлээгээд дахин оролдоно уу.");
     await mpost(`carts/${cart.id}/shipping-methods`, { option_id: opt.id });
     // Apply coupon after shipping so both item- and shipping-target promos compute.
     if (input.promoCode) {

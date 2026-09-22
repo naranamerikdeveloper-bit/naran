@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart, useToast, useUI, flyToCart } from "@/lib/store";
 import { useT, useLang } from "@/components/LangProvider";
@@ -27,6 +27,8 @@ export function AddToCart({ product }: { product: Product }) {
   const soldOut = (product.variants?.length ?? 0) > 0 && product.variants!.every(v => v.stock === 0);
   // Quantity can't exceed what's in stock for the chosen size (unmanaged → 99).
   const maxQty = Math.max(1, Math.min(99, size ? sizeStock(size) : 99));
+  // Changing size can lower the limit — keep the stepper honest.
+  useEffect(() => { setQty(q => Math.min(q, maxQty)); }, [maxQty]);
 
   function handleAdd(src?: HTMLElement | null, then?: () => void) {
     if (soldOut) { showToast(t("common.soldOut")); return; }

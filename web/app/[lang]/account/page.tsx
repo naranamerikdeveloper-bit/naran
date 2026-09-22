@@ -255,9 +255,6 @@ export default function AccountPage() {
                   <Field name="last" label={t("co.lastName")} defaultValue={user.lastName}/>
                   <Field name="email" label={t("co.email")} defaultValue={user.email} full type="email" readOnly/>
                   <Field name="phone" label={t("co.phone")} defaultValue={user.phone} full error={settingsErrors.phone}/>
-                  <label className="sm:col-span-2 flex items-center gap-2.5 text-sm text-muted">
-                    <input type="checkbox" defaultChecked className="accent-accent"/> {t("acc.emailOptin")}
-                  </label>
                   {settingsBanner && (
                     <div role="alert" className={`sm:col-span-2 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-[13px] ${settingsBanner.ok ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>

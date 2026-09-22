@@ -29,6 +29,8 @@ function CountBadge({ count }: { count: number }) {
 
 export function Nav() {
   const pathname = usePathname();
+  // Paths are locale-prefixed (/mn/shop); nav hrefs are not.
+  const localPath = pathname.replace(/^\/(mn|en)(?=\/|$)/, "") || "/";
   const router = useRouter();
   const items = useCart(s => s.items);
   const wishIds = useWish(s => s.ids);
@@ -111,8 +113,8 @@ export function Nav() {
         <div className="flex flex-wrap items-start gap-x-5 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
           {[["/shop","nav.shop",true],["/shop?category=Fragrance","cat.Fragrance",false],["/shop?type=EDP","nav.edp",false],["/shop?type=EDT","nav.edt",false]].map(([h,k,pri]) => (
             <Link key={k as string} href={h as string}
-              aria-current={pathname === h ? "page" : undefined}
-              className={`relative whitespace-nowrap text-[12px] uppercase tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${pri ? "inline-flex" : "hidden xl:inline-flex"} ${pathname===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k as string)}</Link>
+              aria-current={localPath === h ? "page" : undefined}
+              className={`relative whitespace-nowrap text-[12px] uppercase tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${pri ? "inline-flex" : "hidden xl:inline-flex"} ${localPath===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k as string)}</Link>
           ))}
         </div>
 

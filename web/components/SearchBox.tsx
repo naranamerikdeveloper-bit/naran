@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { SearchIcon } from "./Icons";
 import { useT, useLang } from "./LangProvider";
@@ -78,7 +79,9 @@ export function SearchBox({ className = "", dropdownClassName = "" }: { classNam
   const panel = open && term.length >= 2;
 
   return (
-    <div ref={wrap} className={`relative ${className}`}>
+    <div ref={wrap} className={`relative ${className}`}
+      // Close when keyboard focus leaves the widget (Tab away), not just on click.
+      onBlur={e => { if (!wrap.current?.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
       <div className="flex items-center gap-2.5 h-11 px-4 rounded-pill bg-surface-2 border border-transparent focus-within:border-line focus-within:bg-white transition-colors">
         <button type="button" onClick={showAll} className="text-subtle hover:text-ink shrink-0 active:scale-90 transition" aria-label={t("nav.search")}>
           <SearchIcon width={16} height={16} />
@@ -110,8 +113,9 @@ export function SearchBox({ className = "", dropdownClassName = "" }: { classNam
                   <li key={p.id} id={`${listId}-${i}`} role="option" aria-selected={active === i}>
                     <Link href={`/product/${p.slug}`} onClick={() => setOpen(false)} onMouseEnter={() => setActive(i)}
                       className={`flex items-center gap-3 px-3 py-2 mx-1.5 rounded-xl transition-colors ${active === i ? "bg-accent-soft/60" : "hover:bg-surface-2"}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.image} alt="" loading="lazy" className="w-11 h-11 rounded-lg object-cover bg-surface-2 shrink-0" />
+                      {p.image
+                        ? <Image src={p.image} alt="" width={44} height={44} sizes="44px" className="w-11 h-11 rounded-lg object-cover bg-surface-2 shrink-0" />
+                        : <span className="w-11 h-11 rounded-lg bg-surface-2 shrink-0" />}
                       <div className="min-w-0 flex-1">
                         <div className="text-[13.5px] font-semibold text-ink truncate">{p.name}</div>
                         <div className="text-[12px] text-muted truncate">{p.sub}</div>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
@@ -14,6 +15,7 @@ import { ValueProps } from "./_components/ValueProps";
 import { CategoryRail } from "./_components/CategoryRail";
 import { Marquee } from "./_components/Marquee";
 import { tFor, type Lang } from "@/lib/i18n";
+import { alternatesFor } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -30,6 +32,10 @@ const TILES: { kind: "type" | "cat"; key: string; label: string; href: string }[
   { kind: "type", key: "Cologne", label: "home.tCologne", href: "/shop?type=Cologne" },
 ];
 
+export function generateMetadata({ params }: { params: { lang: Lang } }): Metadata {
+  return { alternates: alternatesFor(params.lang) };
+}
+
 export default async function HomePage({ params }: { params: { lang: Lang } }) {
   const t = tFor(params.lang);
   const L = params.lang;
@@ -41,6 +47,13 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
     medusa.homepageContent(),
   ]);
   const products = productsRes.data;
+  // "New arrivals" = marked New first, then most recently added; "Recommended"
+  // never repeats them.
+  const newest = [...products]
+    .sort((a, b) => Number(b.badge === "New") - Number(a.badge === "New") || (b.createdAt || "").localeCompare(a.createdAt || ""))
+    .slice(0, 8);
+  const newestIds = new Set(newest.map(p => p.id));
+  const recommended = products.filter(p => !newestIds.has(p.id)).slice(0, 8);
   // `hot` can be undefined if the catalog is empty (new/misconfigured store or a
   // transient Medusa error) — never dereference it directly (H2).
   const hot = products.find(p => p.badge === "Sale") || products[0];
@@ -103,7 +116,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   // Site-wide structured data (Organization + WebSite with a Sitelinks search box).
   const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn").replace(/\/$/, "");
   const structuredData = [
-    { "@context": "https://schema.org", "@type": "Organization", name: "NARAN", url: SITE, logo: `${SITE}/icon.svg` },
+    { "@context": "https://schema.org", "@type": "Organization", name: "Наран Америк Бараа", alternateName: "Naran Amerik Baraa", url: SITE, logo: `${SITE}/brand/naran-logo.png`, telephone: "+976 9882-4848", email: "info@naranamerikbaraa.mn" },
     {
       "@context": "https://schema.org", "@type": "WebSite", name: "NARAN", url: SITE,
       potentialAction: { "@type": "SearchAction", target: `${SITE}/${L}/shop?q={search_term_string}`, "query-input": "required name=search_term_string" },
@@ -146,7 +159,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
               <Link href="/shop" className="text-accent text-[13px] font-semibold hover:text-accent-deep transition-colors">{t("common.seeAll")}</Link>
             </Reveal>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3.5 gap-y-8 sm:gap-x-5 sm:gap-y-11 lg:gap-x-6 lg:gap-y-12">
-              {products.slice(0, 8).map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
+              {recommended.map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
             </div>
           </section>
         </div>
@@ -154,7 +167,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
 
       {/* ===================== MARQUEE ===================== */}
       <section className="py-12 sm:py-16 mt-10 sm:mt-14 border-y border-line bg-white">
-        <Marquee kicker={t("home.brandsKicker")} />
+        <Marquee kicker={t("home.brandsKicker")} carried={facets?.brands.map(b => b.key)} />
       </section>
 
       {/* ===================== PROMO BANNER ===================== */}
@@ -197,7 +210,7 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
             </div>
           </Reveal>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {products.slice(4, 12).map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
+            {newest.map((p, i) => <ProductCard key={p.id} product={p} index={i}/>)}
           </div>
           <div className="flex justify-center mt-10">
             <Link href="/shop" className="btn btn-outline">

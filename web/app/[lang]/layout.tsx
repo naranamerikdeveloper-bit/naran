@@ -12,17 +12,26 @@ import { LangProvider } from "@/components/LangProvider";
 import { Consent } from "@/components/Consent";
 import { LOCALES, isLang, tFor } from "@/lib/i18n";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn"),
-  title: "Наран Америк Бараа — 100% оригинал үнэртэй ус",
-  description: "АНУ, Канадаас албан ёсоор ирсэн 100% оригинал үнэртэй ус — Chanel, Dior, Versace, Gucci болон бусад. QPay-ээр төлж, 24–48 цагт хүргүүлээрэй.",
-  openGraph: {
+// Per-locale defaults (pages override title/description as needed).
+const META = {
+  mn: {
     title: "Наран Америк Бараа — 100% оригинал үнэртэй ус",
-    description: "АНУ, Канадаас албан ёсоор ирсэн 100% оригинал үнэртэй ус — 24–48 цагт хүргэнэ.",
-    type: "website",
-    siteName: "NARAN",
+    description: "АНУ, Канадаас албан ёсоор ирсэн 100% оригинал үнэртэй ус — Chanel, Dior, Versace, Gucci болон бусад. QPay-ээр төлж, 24–48 цагт хүргүүлээрэй.",
+  },
+  en: {
+    title: "Naran Amerik Baraa — 100% original fragrances",
+    description: "100% original fragrances sourced officially from the USA and Canada — Chanel, Dior, Versace, Gucci and more. Pay with QPay, delivered in 24–48 hours.",
   },
 };
+export function generateMetadata({ params }: { params: { lang: string } }): Metadata {
+  const m = params.lang === "en" ? META.en : META.mn;
+  return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://naranamerikbaraa.mn"),
+    title: m.title,
+    description: m.description,
+    openGraph: { title: m.title, description: m.description, type: "website", siteName: "Наран Америк Бараа" },
+  };
+}
 
 // Pre-render both locales → static/ISR pages, no cookies() (fast LCP).
 export function generateStaticParams() {

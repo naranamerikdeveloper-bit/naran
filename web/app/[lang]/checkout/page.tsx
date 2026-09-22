@@ -67,7 +67,10 @@ export default function CheckoutPage() {
     finally { setPromoBusy(false); }
   }
   function clearPromo() { setPromo(null); setPromoCode(null); setPromoInput(""); setPromoErr(""); }
-  // Re-price the coupon if the selected shipping option changes (FREESHIP etc.).
+  // Re-price the coupon when the delivery option or the bag changes (FREESHIP,
+  // or items edited in the drawer while on this page) so the summary matches
+  // what the QR will charge.
+  const bagKey = items.map(i => `${i.variantId || i.id}:${i.qty}`).join(",");
   useEffect(() => {
     if (!promoCode) return;
     let cancelled = false;
@@ -76,7 +79,7 @@ export default function CheckoutPage() {
       .catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shipOptionId]);
+  }, [shipOptionId, bagKey]);
 
   // Inline validation — custom messages (consistent with the design) instead of
   // the browser's native popups. Returns true when the form is good to submit.
@@ -127,6 +130,12 @@ export default function CheckoutPage() {
       const coarse = "standard" as const;
       // 1. Build the Medusa cart (not completed yet)
       const { cartId, total: cartTotal } = await medusa.prepareCart({ email, items: lineItems, shippingOptionId: shipOptionId || undefined, address, token: token ?? undefined, promoCode: promoCode ?? undefined });
+      // The QR charges Medusa's total. If it differs from what the summary
+      // showed (price change, promo, delivery fee), ask before charging.
+      if (cartTotal !== total && !window.confirm(t("co.totalChanged").replace("{amount}", money(cartTotal)))) {
+        setBusy(false);
+        return;
+      }
       // 2. Create a Botxon invoice (QPay / bank apps) — money to the merchant's QPay.
       const invoice = await botxon.createInvoice({ cartId, amount: cartTotal, email, shippingMethod: coarse, description: "NARAN" });
       // 3. Stash QR + deeplinks for the pay page, then show the QR and poll status.
@@ -219,6 +228,9 @@ export default function CheckoutPage() {
                 <span>{formError}</span>
               </div>
             )}
+            {mounted && delivery && !delivery.optionId && (
+              <div role="status" className="mb-3 rounded-xl bg-accent-soft/60 px-3.5 py-2.5 text-[13px] text-accent-deep">{t("co.deliveryLoading")}</div>
+            )}
             <button disabled={busy || !deliveryReady} type="submit" className="btn btn-primary w-full justify-center h-[60px] text-base disabled:opacity-60">
               {busy ? (
                 <><span className="w-5 h-5 rounded-full border-2 border-ink/25 border-t-ink animate-spin"/> {t("co.starting")}</>
@@ -237,8 +249,8 @@ export default function CheckoutPage() {
             <h3 className="hd-3">{t("co.order")}</h3>
             <div className="my-3.5 py-3.5 border-t border-b border-border">
               {mounted && items.map(i => (
-                <div key={i.id} className="flex justify-between py-2 text-muted">
-                  <span>{i.name} × {i.qty}</span>
+                <div key={i.variantId || i.id} className="flex justify-between gap-3 py-2 text-muted">
+                  <span className="min-w-0">{i.name}{i.size ? ` · ${i.size}` : ""} × {i.qty}</span>
                   <span>{money(i.price * i.qty)}</span>
                 </div>
               ))}
@@ -275,7 +287,6 @@ export default function CheckoutPage() {
             <Row k={t("cart.subtotal")} v={money(subtotal)}/>
             {discount > 0 && <Row k={t("co.discount")} v={`− ${money(discount)}`}/>}
             <Row k={t("cart.shipping")} v={!delivery && !promo ? "…" : shipping === 0 ? t("common.free") : money(shipping)}/>
-            <Row k={t("cart.tax")} v={money(tax)}/>
             <div className="flex justify-between border-t border-border pt-4.5 mt-3 text-[18px] font-semibold">
               <span>{t("cart.total")}</span>
               <span className="num-tabular overflow-hidden">

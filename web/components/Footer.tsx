@@ -33,6 +33,9 @@ const PinIcon = (p: any) => (
 
 // Four columns on desktop (brand · links · categories · contact), stacked on
 // phones — shown on every screen size so terms/returns are reachable on mobile.
+// [url, label, icon] — e.g. ["https://www.instagram.com/<store>", "Instagram", IgIcon]
+const SOCIAL: [string, string, (p: any) => JSX.Element][] = [];
+
 export function Footer() {
   const t = useT();
   return (
@@ -46,10 +49,13 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Logo variant="full" className="h-20 sm:h-24"/>
             <p className="mt-5 text-[13.5px] leading-relaxed text-muted max-w-sm">{t("foot.tagline")}</p>
-            <div className="mt-5 flex gap-2.5">
-              <Social href="https://instagram.com" label="Instagram"><IgIcon /></Social>
-              <Social href="https://facebook.com" label="Facebook"><FbIcon /></Social>
-            </div>
+            {/* Social links: add the store's real Instagram/Facebook URLs here —
+                bare instagram.com / facebook.com links were misleading. */}
+            {SOCIAL.length > 0 && (
+              <div className="mt-5 flex gap-2.5">
+                {SOCIAL.map(([href, label, Icon]) => <Social key={label} href={href} label={label}><Icon /></Social>)}
+              </div>
+            )}
           </div>
 
           {/* 2. Links */}

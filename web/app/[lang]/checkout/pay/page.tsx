@@ -8,6 +8,8 @@ import { useT, useLang } from "@/components/LangProvider";
 import { money } from "@/lib/api";
 
 const PAY_WINDOW_MS = 30 * 60_000;
+// Gateway-supplied links: https or a bank-app scheme only (never javascript:).
+const safeLink = (u?: string) => !!u && /^(https:|[a-z][a-z0-9+.-]*:\/\/)/i.test(u) && !/^(javascript|data|vbscript):/i.test(u);
 // The window is fixed per invoice (kept in sessionStorage) so a refresh doesn't
 // grant a fresh 30 minutes.
 function deadlineFor(inv: string | null): number {
@@ -85,8 +87,12 @@ function Pay() {
     // 5 minutes, then every 6 s; transient errors never end the session early.
     const end = deadlineFor(inv);
     let errors = 0;
+    // Stop polling when the shopper leaves this page (the loop could otherwise
+    // clear the bag or redirect from another page for up to 30 minutes).
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
-      if (done.current) return;
+      if (done.current || cancelled) return;
       try {
         const { status, order, invoice: fromServer } = await botxon.status(inv);
         // Backfill the QR from the server if sessionStorage was empty (e.g. refresh).
@@ -124,9 +130,11 @@ function Pay() {
       }
       const remaining = end - Date.now();
       if (remaining <= 0) { setError(t("proc.timeout")); return; }
-      setTimeout(tick, PAY_WINDOW_MS - remaining < 5 * 60_000 ? 3000 : errors > 5 ? 10_000 : 6000);
+      if (cancelled) return;
+      timer = setTimeout(tick, PAY_WINDOW_MS - remaining < 5 * 60_000 ? 3000 : errors > 5 ? 10_000 : 6000);
     };
     tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inv]);
 
@@ -192,7 +200,7 @@ function Pay() {
         <div className="mt-6 text-left">
           <p className="text-[12px] font-medium text-muted mb-2.5">{t("pay.appHint")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {invoice.urls.map((u, i) => (
+            {invoice.urls.filter(u => safeLink(u.link)).map((u, i) => (
               <a key={u.link + i} href={u.link} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2.5 hover:border-ink/40 hover:-translate-y-px transition-all duration-200 ease-elegant">
                 {u.logo ? (
@@ -208,7 +216,7 @@ function Pay() {
         </div>
       ) : null}
 
-      {invoice?.shortUrl ? (
+      {invoice?.shortUrl && safeLink(invoice.shortUrl) ? (
         <a href={invoice.shortUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-5 text-[13px] text-accent-deep underline underline-offset-2">
           {t("pay.shortUrl")}
         </a>

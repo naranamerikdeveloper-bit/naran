@@ -97,7 +97,6 @@ export default function CartPage() {
               <div className="mt-4">
                 <Row k={t("cart.subtotal")} v={money(subtotal)}/>
                 <Row k={t("cart.shipping")} v={!delivery ? "…" : shipping === 0 ? t("common.free") : money(shipping)}/>
-                <Row k={t("cart.tax")} v={money(tax)}/>
               </div>
               <div className="flex justify-between border-t border-line mt-4 pt-4 font-display text-[20px]">
                 <span>{t("cart.total")}</span><span className="num-tabular">{money(total)}</span>
