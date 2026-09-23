@@ -5,7 +5,7 @@ import {
   createOrderPaymentCollectionWorkflow,
   markPaymentCollectionAsPaid,
 } from "@medusajs/medusa/core-flows";
-import { decrementStockForVariants } from "../../../lib/catalog";
+import { decrementStockForVariants, stockForVariants } from "../../../lib/catalog";
 import { reserveOrderItems, fulfillOrder, shipOrder, deliverOrder } from "../../../lib/fulfillment";
 
 const CURRENCY = "mnt";
@@ -14,6 +14,21 @@ const CURRENCY = "mnt";
 // price) for the in-person sale form. Published products only.
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
+
+  // ?summary=1 → today's in-store sales (count + total), for the POS header.
+  if (req.query.summary) {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const { data } = await query.graph({
+      entity: "order",
+      fields: ["id", "total", "created_at", "metadata"],
+      filters: { created_at: { $gte: start.toISOString() } } as any,
+      pagination: { take: 500, skip: 0, order: { created_at: "DESC" } },
+    });
+    const today = (data || []).filter((o: any) => o?.metadata?.offline);
+    res.json({ summary: { count: today.length, total: today.reduce((a: number, o: any) => a + Number(o.total || 0), 0) } });
+    return;
+  }
+
   const q = (req.query.q as string) || "";
   const filters: any = { status: "published" };
   if (q) filters.title = { $ilike: `%${q}%` };
@@ -22,8 +37,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     entity: "product",
     fields: [
       "id", "title", "thumbnail",
-      "variants.id", "variants.title", "variants.sku",
+      "variants.id", "variants.title", "variants.sku", "variants.manage_inventory",
       "variants.prices.amount", "variants.prices.currency_code",
+      "variants.inventory_items.inventory.location_levels.available_quantity",
     ],
     filters,
     pagination: { take: 50, skip: 0, order: { title: "ASC" } },
@@ -35,7 +51,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     thumbnail: p.thumbnail || "",
     variants: (p.variants || []).map((v: any) => {
       const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);
-      return { id: v.id, title: v.title || p.title, sku: v.sku || "", price: mnt ? Number(mnt.amount) : 0 };
+      const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
+      const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
+      return { id: v.id, title: v.title || p.title, sku: v.sku || "", price: mnt ? Number(mnt.amount) : 0, manage: v.manage_inventory !== false, stock: v.manage_inventory === false ? null : available };
     }),
   }));
 
@@ -60,6 +78,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   if (!items.length) {
     res.status(400).json({ message: "Дор хаяж нэг бараа сонгоно уу." });
+    return;
+  }
+
+  // Refuse to oversell: managed variants can't go below zero.
+  const stock = await stockForVariants(req.scope, items.map((i: any) => i.variant_id));
+  const short = items
+    .map((i: any) => ({ i, s: stock.get(i.variant_id) }))
+    .filter((x: any) => x.s?.manage && x.i.quantity > x.s.available)
+    .map((x: any) => `${x.i.title} (үлд: ${x.s.available})`);
+  if (short.length) {
+    res.status(409).json({ message: `Үлдэгдэл хүрэлцэхгүй: ${short.join(", ")}` });
     return;
   }
 
@@ -158,7 +187,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       } catch { /* leave stock untouched; sale still recorded */ }
     }
 
-    res.json({ id: orderId, display_id: (result as any)?.display_id ?? null, total, paid, fulfilled, stockAdjusted });
+    res.json({
+      id: orderId,
+      display_id: (result as any)?.display_id ?? null,
+      total: orderTotal,
+      paid, fulfilled, stockAdjusted,
+      // For the printable receipt (server is the source of truth on totals).
+      receipt: {
+        items: items.map((i: any) => ({ title: i.title, quantity: i.quantity, unit_price: i.unit_price, amount: i.unit_price * i.quantity })),
+        total: orderTotal,
+        paymentMethod: String(body?.paymentMethod || "cash"),
+        customerName: String(body?.customerName || "").slice(0, 120) || null,
+        at: new Date().toISOString(),
+      },
+    });
   } catch (e: any) {
     res.status(500).json({ message: e?.message || "Борлуулалт бүртгэхэд алдаа гарлаа" });
   }

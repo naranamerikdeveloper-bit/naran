@@ -185,6 +185,37 @@ export async function lowStockVariants(container: any, threshold = 5): Promise<L
 // Decrement on-hand stock for a set of variants (used when recording an offline
 // sale). Only touches inventory-managed variants; unmanaged ones are treated as
 // unlimited and skipped. Clamps at 0. Absolute set via updateInventoryLevelsWorkflow.
+// Available stock per variant id. { manage:false } = unlimited (not tracked).
+// Used by the POS to show stock and to refuse overselling.
+export async function stockForVariants(
+  container: any,
+  ids: string[],
+): Promise<Map<string, { manage: boolean; available: number }>> {
+  const out = new Map<string, { manage: boolean; available: number }>();
+  const want = new Set(ids.map(String));
+  if (!want.size) return out;
+  const query = container.resolve(ContainerRegistrationKeys.QUERY);
+  for (let skip = 0; out.size < want.size; skip += 500) {
+    const { data } = await query.graph({
+      entity: "variant",
+      fields: [
+        "id", "manage_inventory",
+        "inventory_items.inventory.location_levels.available_quantity",
+      ],
+      pagination: { skip, take: 500 },
+    });
+    for (const v of data as any[]) {
+      if (!want.has(v.id) || out.has(v.id)) continue;
+      if (!v.manage_inventory) { out.set(v.id, { manage: false, available: 0 }); continue; }
+      const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
+      const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
+      out.set(v.id, { manage: true, available });
+    }
+    if (!data.length || data.length < 500) break;
+  }
+  return out;
+}
+
 export async function decrementStockForVariants(
   container: any,
   items: { variant_id: string; quantity: number }[],
