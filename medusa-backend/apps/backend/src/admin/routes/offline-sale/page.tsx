@@ -215,7 +215,10 @@ const OfflineSalePage = () => {
             )}
             {results.map(p => (
               <div key={p.id} className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {p.thumbnail
+                    ? <img src={p.thumbnail} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md object-cover bg-ui-bg-subtle" />
+                    : <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-ui-bg-subtle text-ui-fg-muted"><ShoppingBag /></div>}
                   <Text size="small" weight="plus" className="truncate">{p.title}</Text>
                 </div>
                 <div className="mt-2 flex flex-col gap-1.5">
