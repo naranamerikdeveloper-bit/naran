@@ -5,20 +5,12 @@ import { useEffect, useState } from "react";
 import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
 import { PageHeader, Panel, TableCard } from "../../lib/ui";
+import { tug, PAY_LABEL, printReceipt, type Receipt } from "../../lib/receipt";
 
 type Variant = { id: string; title: string; sku: string; price: number; manage: boolean; stock: number | null };
 type Product = { id: string; title: string; thumbnail: string; variants: Variant[] };
 // `max` = stock cap (null = unlimited / not tracked).
 type Line = { variant_id: string; title: string; unit_price: number; quantity: number; max: number | null };
-
-type Receipt = {
-  items: { title: string; quantity: number; unit_price: number; amount: number }[];
-  total: number; paymentMethod: string; customerName: string | null; at: string;
-  no: string; paid: boolean; cash?: number; change?: number;
-};
-
-const tug = (n: number) => `₮${new Intl.NumberFormat("en-US").format(Math.round(n || 0))}`;
-const PAY_LABEL: Record<string, string> = { cash: "Бэлэн мөнгө", card: "Карт", qpay: "QPay", transfer: "Банк шилжүүлэг" };
 
 async function adminFetch(path: string, init?: RequestInit) {
   const res = await fetch(`/admin${path}`, {
@@ -32,50 +24,6 @@ async function adminFetch(path: string, init?: RequestInit) {
 
 const PAYMENTS = Object.entries(PAY_LABEL).map(([value, label]) => ({ value, label }));
 
-// Plain (non-official, non e-barimt) sale receipt, printed in a new window.
-function printReceipt(r: Receipt) {
-  const rows = r.items.map(it =>
-    `<tr><td>${escapeHtml(it.title)}</td><td class="c">${it.quantity}</td><td class="r">${tug(it.unit_price)}</td><td class="r">${tug(it.amount)}</td></tr>`
-  ).join("");
-  const cashRows = r.paymentMethod === "cash" && r.cash != null
-    ? `<div class="row"><span>Авсан</span><span>${tug(r.cash)}</span></div><div class="row"><span>Хариулт</span><span>${tug(r.change ?? 0)}</span></div>`
-    : "";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${r.no}</title>
-<style>
-  *{font-family:ui-monospace,"Courier New",monospace;box-sizing:border-box}
-  body{width:72mm;margin:0 auto;padding:8px 6px;color:#000;font-size:12px}
-  h1{font-size:15px;text-align:center;margin:2px 0}
-  .sub{text-align:center;font-size:10px;margin-bottom:6px}
-  hr{border:none;border-top:1px dashed #000;margin:6px 0}
-  table{width:100%;border-collapse:collapse}
-  td{padding:2px 0;vertical-align:top}
-  .c{text-align:center}.r{text-align:right}
-  .row{display:flex;justify-content:space-between;margin:1px 0}
-  .tot{font-size:14px;font-weight:bold}
-  .foot{text-align:center;font-size:10px;margin-top:8px}
-  @media print{@page{margin:0}}
-</style></head><body>
-  <h1>НАРАН АМЕРИК БАРАА</h1>
-  <div class="sub">Утас: 9882-4848<br/>Баримт (албан бус)</div>
-  <hr/>
-  <div class="row"><span>Дугаар</span><span>${escapeHtml(r.no)}</span></div>
-  <div class="row"><span>Огноо</span><span>${new Date(r.at).toLocaleString("mn-MN")}</span></div>
-  ${r.customerName ? `<div class="row"><span>Харилцагч</span><span>${escapeHtml(r.customerName)}</span></div>` : ""}
-  <hr/>
-  <table><tr><td>Бараа</td><td class="c">Тоо</td><td class="r">Үнэ</td><td class="r">Дүн</td></tr>${rows}</table>
-  <hr/>
-  <div class="row tot"><span>НИЙТ</span><span>${tug(r.total)}</span></div>
-  <div class="row"><span>Төлбөр</span><span>${PAY_LABEL[r.paymentMethod] || r.paymentMethod}</span></div>
-  ${cashRows}
-  <div class="foot">Худалдан авсанд баярлалаа!<br/>naranamerikbaraa.mn</div>
-  <script>window.onload=function(){window.print();setTimeout(function(){window.close()},300)}</script>
-</body></html>`;
-  const w = window.open("", "_blank", "width=380,height=640");
-  if (!w) { toast.error("Хэвлэх цонх нээгдсэнгүй (popup-ыг зөвшөөрнө үү)."); return; }
-  w.document.write(html); w.document.close();
-}
-function escapeHtml(s: string) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string)); }
-
 const OfflineSalePage = () => {
   const { loading: permLoading, can } = usePermissions();
   const [q, setQ] = useState("");
@@ -87,6 +35,8 @@ const OfflineSalePage = () => {
   const [email, setEmail] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [cash, setCash] = useState("");            // cash received (string input)
+  const [discMode, setDiscMode] = useState<"pct" | "amt">("pct");
+  const [discVal, setDiscVal] = useState("");       // discount value (% or ₮)
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [last, setLast] = useState<Receipt | null>(null);
@@ -135,8 +85,11 @@ const OfflineSalePage = () => {
   };
   const removeLine = (id: string) => setLines(prev => prev.filter(l => l.variant_id !== id));
 
-  const total = lines.reduce((a, l) => a + l.unit_price * l.quantity, 0);
+  const subtotal = lines.reduce((a, l) => a + l.unit_price * l.quantity, 0);
   const count = lines.reduce((a, l) => a + l.quantity, 0);
+  const discNum = Math.max(0, Math.round(Number(discVal) || 0));
+  const discount = Math.min(subtotal, discMode === "pct" ? Math.round(subtotal * Math.min(100, discNum) / 100) : discNum);
+  const total = subtotal - discount;
   const cashNum = Math.max(0, Math.round(Number(cash) || 0));
   const change = paymentMethod === "cash" && cash !== "" ? cashNum - total : null;
   const cashShort = paymentMethod === "cash" && cash !== "" && cashNum < total;
@@ -154,6 +107,7 @@ const OfflineSalePage = () => {
           customerName: customerName.trim() || undefined,
           phone: phone.trim() || undefined,
           paymentMethod,
+          discount: discount || undefined,
           note: note.trim() || undefined,
         }),
       });
@@ -165,7 +119,7 @@ const OfflineSalePage = () => {
       };
       setLast(receipt);
       toast.success(`Борлуулалт бүртгэгдлээ (${no}) · ${tug(r.total ?? total)}${r.paid ? " · Төлсөн" : ""}`);
-      setLines([]); setCustomerName(""); setPhone(""); setEmail(""); setNote(""); setPaymentMethod("cash"); setCash("");
+      setLines([]); setCustomerName(""); setPhone(""); setEmail(""); setNote(""); setPaymentMethod("cash"); setCash(""); setDiscVal("");
       loadSummary();
     } catch (e: any) {
       toast.error(e?.message || "Борлуулалт бүртгэхэд алдаа гарлаа");
@@ -292,9 +246,28 @@ const OfflineSalePage = () => {
               </Table>
             </TableCard>
           )}
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-ui-bg-subtle px-4 py-3">
-            <Text weight="plus">Нийт дүн</Text>
-            <Text weight="plus" className="text-lg tabular-nums">{tug(total)}</Text>
+          {/* Discount */}
+          <div className="mt-3 flex items-center gap-2">
+            <Label size="small" className="shrink-0">Хямдрал</Label>
+            <Input inputMode="numeric" value={discVal} onChange={e => setDiscVal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="flex-1" />
+            <div className="flex overflow-hidden rounded-md border border-ui-border-base">
+              {(["pct", "amt"] as const).map(m => (
+                <button key={m} type="button" onClick={() => setDiscMode(m)}
+                  className={`px-3 py-1.5 txt-compact-small ${discMode === m ? "bg-ui-bg-base-pressed font-medium" : "bg-ui-bg-subtle text-ui-fg-muted hover:bg-ui-bg-subtle-hover"}`}>{m === "pct" ? "%" : "₮"}</button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 space-y-1 rounded-lg bg-ui-bg-subtle px-4 py-3">
+            {discount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-ui-fg-subtle"><Text size="small">Дүн</Text><Text size="small" className="tabular-nums">{tug(subtotal)}</Text></div>
+                <div className="flex items-center justify-between text-ui-fg-subtle"><Text size="small">Хямдрал</Text><Text size="small" className="tabular-nums">−{tug(discount)}</Text></div>
+              </>
+            )}
+            <div className="flex items-center justify-between">
+              <Text weight="plus">Нийт дүн</Text>
+              <Text weight="plus" className="text-lg tabular-nums">{tug(total)}</Text>
+            </div>
           </div>
         </div>
       </div>

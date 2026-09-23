@@ -29,6 +29,48 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     return;
   }
 
+  // ?report=YYYY-MM-DD (or "today") → day-close / Z-report of in-store sales.
+  if (req.query.report) {
+    const day = String(req.query.report) === "today" ? new Date() : new Date(String(req.query.report));
+    const start = new Date(day); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    const { data } = await query.graph({
+      entity: "order",
+      fields: [
+        "id", "display_id", "total", "created_at", "metadata",
+        "items.title", "items.quantity", "items.unit_price", "items.total",
+      ],
+      filters: { created_at: { $gte: start.toISOString(), $lt: end.toISOString() } } as any,
+      pagination: { take: 1000, skip: 0, order: { created_at: "DESC" } },
+    });
+    const sales = (data || []).filter((o: any) => o?.metadata?.offline).map((o: any) => ({
+      no: o.display_id ? `NT-${o.display_id}` : o.id,
+      at: o.created_at,
+      payment: String(o.metadata?.payment_method || "cash"),
+      customerName: o.metadata?.customer_name || null,
+      discount: Number(o.metadata?.discount || 0),
+      total: Number(o.total || 0),
+      items: (o.items || []).map((it: any) => ({
+        title: it.title, quantity: it.quantity,
+        unit_price: Number(it.unit_price || 0), amount: Number((it.total ?? it.unit_price * it.quantity) || 0),
+      })),
+    }));
+    const byMethod: Record<string, { count: number; total: number }> = {};
+    for (const sale of sales) {
+      const m = byMethod[sale.payment] || { count: 0, total: 0 };
+      m.count++; m.total += sale.total; byMethod[sale.payment] = m;
+    }
+    res.json({
+      report: {
+        date: start.toISOString().slice(0, 10),
+        count: sales.length,
+        total: sales.reduce((a: number, s2: any) => a + s2.total, 0),
+        byMethod, sales,
+      },
+    });
+    return;
+  }
+
   const q = (req.query.q as string) || "";
   const filters: any = { status: "published" };
   if (q) filters.title = { $ilike: `%${q}%` };
@@ -92,6 +134,16 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return;
   }
 
+  // Optional order-level discount (MNT), computed on the client from % or amount.
+  const rawTotal = items.reduce((a: number, i: any) => a + i.unit_price * i.quantity, 0);
+  const discount = Math.min(rawTotal, Math.max(0, Math.round(Number(body?.discount) || 0)));
+  // Apply it by scaling line prices to hit (rawTotal − discount); the order
+  // total (Analytics/Reports) then equals what the customer actually paid.
+  const factor = discount > 0 && rawTotal > 0 ? (rawTotal - discount) / rawTotal : 1;
+  const orderItems = items.map((i: any) => ({ ...i, unit_price: Math.max(0, Math.round(i.unit_price * factor)) }));
+  const scaledTotal = orderItems.reduce((a: number, i: any) => a + i.unit_price * i.quantity, 0);
+  const effectiveDiscount = rawTotal - scaledTotal;
+
   const regionModule = req.scope.resolve(Modules.REGION);
   const regions = await regionModule.listRegions({});
   const region = regions.find((r: any) => r.currency_code === CURRENCY) || regions[0];
@@ -116,20 +168,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         currency_code: region.currency_code,
         email,
         sales_channel_id: salesChannelId,
-        items,
+        items: orderItems,
         metadata: {
           offline: true,
           payment_method: String(body?.paymentMethod || "cash").slice(0, 40),
           customer_name: String(body?.customerName || "").slice(0, 120) || null,
           phone: String(body?.phone || "").slice(0, 40) || null,
           note: String(body?.note || "").slice(0, 500) || null,
+          discount: effectiveDiscount || null,
           recorded_by: (req as any).auth_context?.actor_id || null,
         },
       } as any,
     });
     const orderId = (result as any)?.id as string | undefined;
-    const total = items.reduce((a: number, b: any) => a + b.unit_price * b.quantity, 0);
-    const orderTotal = Number((result as any)?.total) || total;
+    const orderTotal = Number((result as any)?.total) || scaledTotal;
 
     // Mark the sale as paid: an offline sale is money already collected. Create a
     // payment collection for the order then mark it captured. Best-effort — a
@@ -195,6 +247,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       // For the printable receipt (server is the source of truth on totals).
       receipt: {
         items: items.map((i: any) => ({ title: i.title, quantity: i.quantity, unit_price: i.unit_price, amount: i.unit_price * i.quantity })),
+        subtotal: rawTotal,
+        discount: effectiveDiscount || 0,
         total: orderTotal,
         paymentMethod: String(body?.paymentMethod || "cash"),
         customerName: String(body?.customerName || "").slice(0, 120) || null,
