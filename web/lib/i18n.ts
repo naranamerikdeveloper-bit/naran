@@ -94,6 +94,7 @@ const en: Dict = {
   "auth.password": "Password", "auth.remember": "Remember me", "auth.forgot": "Forgot password?",
   "auth.or": "or", "auth.haveAccount": "Already have an account?", "auth.noAccount": "New to NARAN?",
   "auth.google": "Continue with Google", "auth.googleUnavailable": "Google sign-in isn't available right now.", "auth.welcome": "Welcome!",
+  "auth.emailTaken": "This email is already registered. Please sign in — or use “Continue with Google”.", "auth.loginFailed": "Wrong email or password. If you signed up with Google, use “Continue with Google” below.",
   "auth.googleFinishing": "Finishing Google sign-in…", "auth.googleFailed": "Google sign-in failed", "auth.googleFailedHint": "Please try again, or sign in with your email.",
   // account
   "acc.welcome": "Welcome back", "acc.signOut": "Sign out", "acc.overview": "Overview", "acc.orders": "Orders",
@@ -288,6 +289,7 @@ const mn: Dict = {
   "auth.password": "Нууц үг", "auth.remember": "Намайг сана", "auth.forgot": "Нууц үг мартсан уу?",
   "auth.or": "эсвэл", "auth.haveAccount": "Бүртгэлтэй юу?", "auth.noAccount": "NARAN-д шинэ юу?",
   "auth.google": "Google-ээр нэвтрэх", "auth.googleUnavailable": "Google нэвтрэлт одоогоор боломжгүй байна.", "auth.welcome": "Тавтай морил!",
+  "auth.emailTaken": "Энэ имэйл бүртгэлтэй байна. Нэвтэрнэ үү — эсвэл доорх “Google-ээр нэвтрэх”-ийг ашиглана уу.", "auth.loginFailed": "Имэйл эсвэл нууц үг буруу байна. Google-ээр бүртгүүлсэн бол доорх “Google-ээр нэвтрэх”-ийг ашиглана уу.",
   "auth.googleFinishing": "Google нэвтрэлтийг дуусгаж байна…", "auth.googleFailed": "Google нэвтрэлт амжилтгүй боллоо", "auth.googleFailedHint": "Дахин оролдоно уу, эсвэл имэйлээрээ нэвтэрнэ үү.",
   "acc.welcome": "Тавтай морил", "acc.signOut": "Гарах", "acc.overview": "Тойм", "acc.orders": "Захиалга",
   "acc.wishlist": "Хадгалсан", "acc.addresses": "Хаягууд", "acc.settings": "Тохиргоо",

@@ -106,7 +106,16 @@ export default function AuthPage() {
       showToast(`${t("auth.welcomeName")}, ${result.user.firstName}!`);
       router.push(`/${lang}/account`);
     } catch (err: any) {
-      const msg = err.message || t("toast.authFailed");
+      const raw = String(err?.message || "");
+      // Google-created accounts have no password: guide the shopper to the
+      // Google button instead of a raw Medusa error.
+      let msg = raw || t("toast.authFailed");
+      if (/already has an account|already exists/i.test(raw)) {
+        msg = t("auth.emailTaken");
+        setMode("login");
+      } else if (!isReg && /unauthor|invalid|401|credential/i.test(raw)) {
+        msg = t("auth.loginFailed");
+      }
       showToast(msg);
       setFormError(msg);
       setBusy(false);

@@ -152,10 +152,8 @@ export default async function ProductPage({ params }: { params: { lang: Lang; id
 
               <AddToCart product={product}/>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-line">
+              <div className="mt-6 pt-5 border-t border-line">
                 <Trust label={t("pdp.trustShipping")}/>
-                <Trust label={t("pdp.trustReturns")}/>
-                <Trust label={t("pdp.trustWarranty")}/>
               </div>
             </div>
           </section>
