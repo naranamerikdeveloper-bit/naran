@@ -410,7 +410,14 @@ export const medusa = {
           firstName: String(m.given_name || m.name || email.split("@")[0]),
           lastName: String(m.family_name || ""),
         });
-        return { token, user: await fetchMe(token) };
+        // The callback token was issued before the customer existed, so its
+        // actor_id is empty and /me still 401s. Refresh to get a customer-bound
+        // token now that the identity is linked.
+        const refreshed = await fetch(`${URL}/auth/token/refresh`, {
+          method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        }).then(r => r.json()).catch(() => ({}));
+        const finalToken: string = refreshed?.token || token;
+        return { token: finalToken, user: await fetchMe(finalToken) };
       }
     },
     // Request a password-reset link. Medusa emits `auth.password_reset`; our
