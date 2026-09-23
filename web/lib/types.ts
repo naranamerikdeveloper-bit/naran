@@ -33,6 +33,9 @@ export type Product = {
   brand?: string;
   // EDP | EDT | Parfum | Extrait | Cologne | Mist | Set (metadata.fragrance_type)
   fragranceType?: string;
+  // Set from metadata.gender (Men|Women|Unisex) when present — powers the
+  // "хэрэглэгч" filter. Undefined = untagged (not counted).
+  genderTag?: "Men" | "Women" | "Unisex";
   createdAt?: string;
 };
 
@@ -42,7 +45,7 @@ export type ListResult = {
   total: number;
   // Counts for the shop filters. Each facet is counted with every OTHER active
   // filter applied, so a count is exactly what clicking that option returns.
-  facets?: { categories: FacetCount[]; brands: FacetCount[]; types: FacetCount[]; newCount: number };
+  facets?: { categories: FacetCount[]; brands: FacetCount[]; types: FacetCount[]; sizes: FacetCount[]; genders: FacetCount[]; newCount: number };
 };
 
 export type CartItem = {

@@ -5,7 +5,10 @@ import { useT } from "@/components/LangProvider";
 import { TYPE_LABEL } from "@/lib/catalog";
 import type { FacetCount } from "@/lib/types";
 
-type Facets = { brands: FacetCount[]; types: FacetCount[]; newCount: number };
+type Facets = { brands: FacetCount[]; types: FacetCount[]; sizes: FacetCount[]; genders: FacetCount[]; newCount: number };
+
+// "хэрэглэгч" audience labels (key → i18n key).
+const GENDER_LABEL: Record<string, string> = { women: "gender.women", men: "gender.men", unisex: "gender.unisex", gift: "gender.gift" };
 
 // Build a new URL from the current params, setting (or clearing) the given keys.
 function useSetParams() {
@@ -56,9 +59,11 @@ export function ShopFilters({ facets }: { facets: Facets }) {
 
   const brands = listOf(sp.get("brand"));
   const types = listOf(sp.get("type"));
+  const sizes = listOf(sp.get("size"));
+  const genders = listOf(sp.get("gender"));
   const onlyNew = sp.get("filter") === "new";
   const minP = sp.get("minPrice"), maxP = sp.get("maxPrice");
-  const activeCount = brands.length + types.length + (onlyNew ? 1 : 0) + (minP || maxP ? 1 : 0);
+  const activeCount = brands.length + types.length + sizes.length + genders.length + (onlyNew ? 1 : 0) + (minP || maxP ? 1 : 0);
 
   const [open, setOpen] = useState(activeCount > 0);
   const [min, setMin] = useState(minP ?? "");
@@ -73,7 +78,7 @@ export function ShopFilters({ facets }: { facets: Facets }) {
     return [...m].filter(([k]) => !needle || k.toLowerCase().includes(needle)).sort((a, b) => a[0].localeCompare(b[0]));
   }, [facets.brands, brands, q]);
 
-  const clearAll = () => { setMin(""); setMax(""); setParams({ brand: null, type: null, filter: null, minPrice: null, maxPrice: null }); };
+  const clearAll = () => { setMin(""); setMax(""); setParams({ brand: null, type: null, size: null, gender: null, filter: null, minPrice: null, maxPrice: null }); };
   const typeName = (k: string) => (k === "Set" ? t("type.Set") : TYPE_LABEL[k] || k);
 
   return (
@@ -97,6 +102,12 @@ export function ShopFilters({ facets }: { facets: Facets }) {
         {types.map(k => (
           <Chip key={`t-${k}`} onRemove={() => setParams({ type: toggleIn(types, k).join(",") || null })}>{typeName(k)}</Chip>
         ))}
+        {sizes.map(sz => (
+          <Chip key={`s-${sz}`} onRemove={() => setParams({ size: toggleIn(sizes, sz).join(",") || null })}>{sz}</Chip>
+        ))}
+        {genders.map(g => (
+          <Chip key={`g-${g}`} onRemove={() => setParams({ gender: toggleIn(genders, g).join(",") || null })}>{t(GENDER_LABEL[g] || g)}</Chip>
+        ))}
         {onlyNew && <Chip onRemove={() => setParams({ filter: null })}>{t("shop.onlyNew")}</Chip>}
         {(minP || maxP) && (
           <Chip onRemove={() => { setMin(""); setMax(""); setParams({ minPrice: null, maxPrice: null }); }}>
@@ -109,7 +120,7 @@ export function ShopFilters({ facets }: { facets: Facets }) {
       </div>
 
       {open && (
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-[1.3fr_1fr_1fr] gap-5 bg-white border border-line rounded-2xl p-5 shadow-soft">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 bg-white border border-line rounded-2xl p-5 shadow-soft">
           {/* Brand */}
           <div className="min-w-0">
             <Label>{t("shop.fBrand")}</Label>
@@ -154,6 +165,46 @@ export function ShopFilters({ facets }: { facets: Facets }) {
               </label>
             )}
           </div>
+
+          {/* Size */}
+          {facets.sizes.length > 0 && (
+            <div>
+              <Label>{t("shop.fSize")}</Label>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {facets.sizes.map(({ key, count }) => {
+                  const on = sizes.includes(key);
+                  return (
+                    <button key={key} onClick={() => setParams({ size: toggleIn(sizes, key).join(",") || null })} aria-pressed={on}
+                      disabled={count === 0 && !on}
+                      className={`text-[12px] px-3 h-8 rounded-pill inline-flex items-center gap-1.5 transition ${
+                        on ? "bg-accent-deep text-white" : "bg-surface-2 text-muted hover:text-ink"} ${count === 0 && !on ? "opacity-40" : ""}`}>
+                      {key} <span className={`num-tabular ${on ? "opacity-70" : "text-subtle"}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Audience (хэрэглэгч) */}
+          {facets.genders.length > 0 && (
+            <div>
+              <Label>{t("shop.fGender")}</Label>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {facets.genders.map(({ key, count }) => {
+                  const on = genders.includes(key);
+                  return (
+                    <button key={key} onClick={() => setParams({ gender: toggleIn(genders, key).join(",") || null })} aria-pressed={on}
+                      disabled={count === 0 && !on}
+                      className={`text-[12px] px-3 h-8 rounded-pill inline-flex items-center gap-1.5 transition ${
+                        on ? "bg-accent-deep text-white" : "bg-surface-2 text-muted hover:text-ink"} ${count === 0 && !on ? "opacity-40" : ""}`}>
+                      {t(GENDER_LABEL[key] || key)} <span className={`num-tabular ${on ? "opacity-70" : "text-subtle"}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Price */}
           <div>

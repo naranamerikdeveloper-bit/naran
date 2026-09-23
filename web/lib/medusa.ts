@@ -181,6 +181,8 @@ function map(m: any): Product {
     category,
     shape: known ? e.shape : (category === "Gift" ? "giftset" : category === "Body" ? "lotion" : "perfume"),
     gender: e.gender,
+    // Real gender tag from metadata (Men|Women|Unisex); undefined when untagged.
+    genderTag: (["Men", "Women", "Unisex"] as const).find(g => g === meta.gender),
     season: e.season,
     price,
     was: known && e.wasMultiplier ? Math.round(price * e.wasMultiplier) : undefined,
@@ -283,6 +285,9 @@ export const medusa = {
       // Multi-select filters travel as comma lists: ?brand=CHANEL,DIOR&type=EDP
       const brands = (params.brand || "").split(",").map(s => s.trim()).filter(Boolean);
       const types = (params.type || "").split(",").map(s => s.trim()).filter(Boolean);
+      const sizes = (params.size || "").split(",").map(s => s.trim()).filter(Boolean);
+      // "хэрэглэгч": men|women|unisex (from metadata.gender) or gift (a Set).
+      const genders = (params.gender || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
       const min = Number(minPrice), max = Number(maxPrice);
 
       // Base set = search results or the whole catalog. Only published products
@@ -294,16 +299,42 @@ export const medusa = {
       const byCat = (p: Product) => !wantCat || p.category === wantCat;
       const byBrand = (p: Product) => !brands.length || (!!p.brand && brands.includes(p.brand));
       const byType = (p: Product) => !types.length || (!!p.fragranceType && types.includes(p.fragranceType));
+      // Variant sizes are messy ("50ml · Amor Amor", "50 мл", "3.4oz") — reduce
+      // each to a clean volume token ("50ml"/"100ml"/"50g") for the facet/filter.
+      const normSizes = (p: Product): string[] => {
+        const out = new Set<string>();
+        for (const raw of p.sizes || []) {
+          const m = String(raw).toLowerCase().replace(/\s|мл/g, m0 => (m0 === "мл" ? "ml" : "")).match(/(\d+(?:\.\d+)?)(ml|g|oz)/);
+          if (m) out.add(`${m[1]}${m[2]}`);
+        }
+        return [...out];
+      };
+      const bySize = (p: Product) => !sizes.length || normSizes(p).some(s => sizes.includes(s));
+      // A product's audience keys: gender tag (metadata) + "gift" for gift sets.
+      const audienceOf = (p: Product): string[] => {
+        const a: string[] = [];
+        if (p.genderTag) a.push(p.genderTag.toLowerCase());
+        if (p.fragranceType === "Set" || p.category === "Gift") a.push("gift");
+        return a;
+      };
+      const byGender = (p: Product) => !genders.length || audienceOf(p).some(a => genders.includes(a));
       const byNew = (p: Product) => filter !== "new" || p.badge === "New";
       const byPrice = (p: Product) =>
         (!minPrice || isNaN(min) || p.price >= min) && (!maxPrice || isNaN(max) || p.price <= max);
-      const all = [byCat, byBrand, byType, byNew, byPrice];
+      const all = [byCat, byBrand, byType, bySize, byGender, byNew, byPrice];
       const except = (skip: (p: Product) => boolean) => base.filter(p => all.every(f => f === skip || f(p)));
       const tally = (items: Product[], key: (p: Product) => string | undefined): FacetCount[] => {
         const m = new Map<string, number>();
         for (const p of items) { const k = key(p); if (k) m.set(k, (m.get(k) || 0) + 1); }
         return [...m].map(([k, count]) => ({ key: k, count }));
       };
+      // A product can carry several sizes / audiences → count each.
+      const tallyMulti = (items: Product[], keys: (p: Product) => string[]): FacetCount[] => {
+        const m = new Map<string, number>();
+        for (const p of items) for (const k of keys(p)) if (k) m.set(k, (m.get(k) || 0) + 1);
+        return [...m].map(([k, count]) => ({ key: k, count }));
+      };
+      const sizeMl = (s: string) => { const n = parseInt(s, 10); return isNaN(n) ? 9999 : n; };
 
       let list = base.filter(p => all.every(f => f(p)));
       const byName = (a: Product, b: Product) => a.name.localeCompare(b.name);
@@ -327,6 +358,10 @@ export const medusa = {
           categories: tally(except(byCat), p => p.category),
           brands: tally(except(byBrand), p => p.brand).sort((a, b) => a.key.localeCompare(b.key)),
           types: tally(except(byType), p => p.fragranceType).sort((a, b) => b.count - a.count),
+          sizes: tallyMulti(except(bySize), normSizes)
+            .sort((a, b) => sizeMl(a.key) - sizeMl(b.key)),
+          genders: tallyMulti(except(byGender), audienceOf)
+            .sort((a, b) => ["women", "men", "unisex", "gift"].indexOf(a.key) - ["women", "men", "unisex", "gift"].indexOf(b.key)),
           newCount: except(byNew).filter(p => p.badge === "New").length,
         },
       };

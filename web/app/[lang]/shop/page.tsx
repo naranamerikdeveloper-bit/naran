@@ -33,7 +33,7 @@ export function generateMetadata({ params }: { params: { lang: Lang } }): Metada
 const cats = ["all", "Fragrance", "Skincare", "Makeup", "Body", "Gift"];
 const PAGE_SIZE = 48;
 
-type ShopParams = { category?: string; sort?: string; q?: string; brand?: string; type?: string; filter?: string; minPrice?: string; maxPrice?: string; page?: string };
+type ShopParams = { category?: string; sort?: string; q?: string; brand?: string; type?: string; size?: string; gender?: string; filter?: string; minPrice?: string; maxPrice?: string; page?: string };
 
 // Page links keep every active filter and only swap `page`.
 function pageHref(sp: ShopParams, page: number) {
@@ -77,12 +77,14 @@ export default async function ShopPage({
     q: searchParams.q,
     brand: searchParams.brand,
     type: searchParams.type,
+    size: searchParams.size,
+    gender: searchParams.gender,
     filter: searchParams.filter,
     minPrice: searchParams.minPrice,
     maxPrice: searchParams.maxPrice,
   }).catch(() => ({ data: [] as Product[], total: 0 }));
   const { data: all, total } = listRes;
-  const facets = listRes.facets ?? { categories: [], brands: [], types: [], newCount: 0 };
+  const facets = listRes.facets ?? { categories: [], brands: [], types: [], sizes: [], genders: [], newCount: 0 };
   const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
   const page = Math.min(pages, Math.max(1, Math.floor(Number(searchParams.page)) || 1));
   const products = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
