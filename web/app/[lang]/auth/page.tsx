@@ -6,7 +6,17 @@ import { useRouter } from "next/navigation";
 import { useAuth, useToast } from "@/lib/store";
 import { useT, useLang } from "@/components/LangProvider";
 import { api } from "@/lib/api";
+import { medusa } from "@/lib/medusa";
 import { EyeIcon, EyeOffIcon, ChevronLeft } from "@/components/Icons";
+
+const GoogleIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+    <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 4.1 29.5 2 24 2 12 2 2 12 2 24s10 22 22 22c11 0 21-8 21-22 0-1.2-.1-2.3-.4-3.5z"/>
+    <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 4.1 29.5 2 24 2 15.5 2 8.2 6.9 6.3 14.7z"/>
+    <path fill="#4CAF50" d="M24 46c5.4 0 10.3-2.1 14-5.4l-6.5-5.5c-2 1.5-4.6 2.4-7.5 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C8.1 41 15.4 46 24 46z"/>
+    <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.5 5.5C40.9 36.3 44 31 44 24c0-1.2-.1-2.3-.4-3.5z"/>
+  </svg>
+);
 
 function pwScore(pw: string): 0 | 1 | 2 | 3 {
   if (!pw) return 0;
@@ -53,6 +63,21 @@ export default function AuthPage() {
     if (!isForgot && form.password.length < (isReg ? 8 : 1)) er.password = isReg ? t("auth.min8") : t("common.required");
     setErrors(er);
     return Object.keys(er).length === 0;
+  }
+
+  const [googleBusy, setGoogleBusy] = useState(false);
+  async function signInWithGoogle() {
+    setGoogleBusy(true);
+    try {
+      const location = await medusa.auth.googleStart();
+      if (!location) { showToast(t("auth.googleUnavailable")); setGoogleBusy(false); return; }
+      // Remember where to return after Google (the callback page reads this).
+      try { sessionStorage.setItem("post_login_lang", lang); } catch { /* private mode */ }
+      window.location.href = location;
+    } catch {
+      showToast(t("auth.googleUnavailable"));
+      setGoogleBusy(false);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -197,6 +222,22 @@ export default function AuthPage() {
               style={{ background: "linear-gradient(95deg, #EF8E80 0%, #D35A4C 100%)" }}>
               {busy ? t("common.pleaseWait") : isForgot ? t("auth.sendResetLink") : isReg ? t("auth.signUp") : t("auth.signIn")}
             </button>
+
+            {!isForgot && (
+              <>
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="h-px flex-1 bg-line" />
+                  <span className="text-[11px] uppercase tracking-wide text-subtle">{t("auth.or")}</span>
+                  <span className="h-px flex-1 bg-line" />
+                </div>
+                <button type="button" onClick={signInWithGoogle} disabled={googleBusy || busy}
+                  className="w-full h-[52px] rounded-full border border-line bg-white text-ink font-semibold text-[14px] grid grid-cols-[1fr_auto_1fr] items-center px-5 hover:bg-surface-2 hover:border-ink/20 disabled:opacity-60 transition active:scale-[.99]">
+                  <GoogleIcon />
+                  <span className="justify-self-center">{googleBusy ? t("common.pleaseWait") : t("auth.google")}</span>
+                  <span />
+                </button>
+              </>
+            )}
 
             {isForgot && (
               <div className="pt-2 text-center">

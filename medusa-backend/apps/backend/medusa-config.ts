@@ -115,6 +115,30 @@ if (useRedis) {
   )
 }
 
+// Auth: email/password always, plus "Sign in with Google" when its credentials
+// are set (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET). The callback URL must match
+// exactly what's registered in the Google Cloud console — it points at the
+// storefront page that finishes the login.
+const STOREFRONT_URL = (process.env.STOREFRONT_URL || 'http://localhost:3000').replace(/\/$/, '')
+const authProviders: any[] = [
+  { resolve: '@medusajs/medusa/auth-emailpass', id: 'emailpass' },
+]
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  authProviders.push({
+    resolve: '@medusajs/medusa/auth-google',
+    id: 'google',
+    options: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || `${STOREFRONT_URL}/mn/auth/google/callback`,
+    },
+  })
+}
+modules.push({
+  resolve: '@medusajs/medusa/auth',
+  options: { providers: authProviders },
+})
+
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,

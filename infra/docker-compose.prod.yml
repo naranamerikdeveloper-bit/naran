@@ -44,6 +44,11 @@ x-medusa-env: &medusa-env
   # Blank RESEND_API_KEY → emails log-only (mock). The worker sends these, so
   # they belong in the shared env (B7).
   STOREFRONT_URL: ${STOREFRONT_URL:-http://localhost:3000}
+  # "Sign in with Google" (optional). Set both to enable; the callback URL must
+  # match the Google Cloud console and defaults to <storefront>/mn/auth/google/callback.
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-}
   # On-demand storefront revalidation (admin saves go live immediately).
   # Defaults to a value derived from COOKIE_SECRET so no extra setup is needed.
   REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${COOKIE_SECRET}}

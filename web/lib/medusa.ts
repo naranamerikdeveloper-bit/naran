@@ -71,6 +71,16 @@ async function createCustomer(token: string, d: { email: string; firstName: stri
     throw new Error(data?.message || "Бүртгэл үүсгэж чадсангүй. Дахин оролдоно уу.");
   }
 }
+// Decode a JWT payload (no verification — only for reading non-secret claims
+// like the Google profile the server already verified). Browser-safe base64url.
+function decodeJwt(token: string): Record<string, any> | null {
+  try {
+    const part = token.split(".")[1];
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decodeURIComponent(escape(json)));
+  } catch { return null; }
+}
+
 async function fetchMe(token: string): Promise<User> {
   const res = await fetch(`${URL}/store/customers/me`, { headers: { ...H, authorization: `Bearer ${token}` } });
   const data = await res.json().catch(() => ({}));
@@ -364,6 +374,45 @@ export const medusa = {
       return { token, user: await fetchMe(token) };
     },
     me: async (token: string) => ({ user: await fetchMe(token) }),
+
+    // "Sign in with Google" — step 1: ask Medusa for the Google consent URL.
+    // Returns null if the provider isn't configured (button then hides).
+    googleStart: async (): Promise<string | null> => {
+      try {
+        const res = await fetch(`${URL}/auth/customer/google`, {
+          method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => ({}));
+        return data?.location || null;
+      } catch { return null; }
+    },
+    // Step 2: on the callback page, exchange the Google code for a session.
+    // Creates the customer on first sign-in (email/name come from the token).
+    googleFinish: async (queryString: string) => {
+      const res = await fetch(`${URL}/auth/customer/google/callback${queryString}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.token) throw new Error(data?.message || "Google нэвтрэлт амжилтгүй боллоо.");
+      const token: string = data.token;
+      try {
+        return { token, user: await fetchMe(token) };
+      } catch {
+        // First Google sign-in → no customer yet. The token carries the verified
+        // Google profile; create the customer from it.
+        const p = decodeJwt(token);
+        const m = (p?.user_metadata || {}) as any;
+        const email = String(m.email || "");
+        if (!email) throw new Error("Google-ээс имэйл ирсэнгүй.");
+        await createCustomer(token, {
+          email,
+          firstName: String(m.given_name || m.name || email.split("@")[0]),
+          lastName: String(m.family_name || ""),
+        });
+        return { token, user: await fetchMe(token) };
+      }
+    },
     // Request a password-reset link. Medusa emits `auth.password_reset`; our
     // subscriber emails the storefront link. Always resolves (201, no body) so
     // we never leak whether the email exists.
