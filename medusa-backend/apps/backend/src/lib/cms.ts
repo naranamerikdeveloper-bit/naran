@@ -1,4 +1,5 @@
 import { Modules } from "@medusajs/framework/utils";
+import { setStoreMeta } from "./store-meta";
 
 // Lightweight CMS for editable homepage content (spec A4 / A-22). Stored on the
 // Store's metadata (metadata.cms_homepage) — no migration, and easy to expand
@@ -60,13 +61,11 @@ export async function readHomepage(scope: { resolve: (k: any) => any }): Promise
 }
 
 export async function writeHomepage(scope: { resolve: (k: any) => any }, content: HomepageContent) {
-  const { storeModule, store } = await getStore(scope);
+  const { store } = await getStore(scope);
   if (!store) throw new Error("Store not found");
-  await storeModule.updateStores(store.id, {
-    // Only our key: Medusa merges metadata against the fresh record, so writing
-    // the whole (possibly stale) object could revert other keys saved meanwhile.
-    metadata: { [KEY]: content },
-  } as any);
+  // Spread existing metadata — Medusa REPLACES metadata, it does not merge (see
+  // lib/store-meta). Writing only { cms_homepage } would wipe the audit log etc.
+  await setStoreMeta(scope, KEY, content);
   return content;
 }
 

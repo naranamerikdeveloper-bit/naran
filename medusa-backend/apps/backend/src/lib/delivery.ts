@@ -1,5 +1,6 @@
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { updateShippingOptionsWorkflow } from "@medusajs/medusa/core-flows";
+import { setStoreMeta } from "./store-meta";
 
 // Single delivery fee, editable from the admin (Биелүүлэлт → Хүргэлтийн төлбөр).
 // The storefront no longer offers a choice of shipping methods: every order uses
@@ -53,12 +54,8 @@ export async function setDeliveryFee(scope: any, fee: number) {
     input: [{ id: current.option_id, prices: [{ currency_code: CURRENCY, amount }] } as any],
   });
 
-  // Pin the option so the choice never drifts when prices change.
-  const { storeModule, store } = await getStore(scope);
-  if (store) {
-    await storeModule.updateStores(store.id, {
-      metadata: { delivery_option_id: current.option_id }, // merged by Medusa
-    });
-  }
+  // Pin the option so the choice never drifts when prices change. Spread existing
+  // metadata — Medusa REPLACES it (see lib/store-meta).
+  await setStoreMeta(scope, "delivery_option_id", current.option_id);
   return getDelivery(scope);
 }

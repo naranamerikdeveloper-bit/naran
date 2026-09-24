@@ -1,5 +1,6 @@
 import { Modules } from "@medusajs/framework/utils";
 import type { StockMove } from "./catalog";
+import { setStoreMeta } from "./store-meta";
 
 // Inventory movement history (spec A-15). Each stock adjustment is recorded with
 // from → to, delta, reason and actor. Stored on Store.metadata.naran_stock_moves
@@ -40,8 +41,8 @@ export async function recordMoves(
     if (!store) return;
     const list: StockHistoryEntry[] = Array.isArray((store.metadata as any)?.[KEY]) ? (store.metadata as any)[KEY] : [];
     const next = [...entries, ...list].slice(0, CAP);
-    // Only our key — Medusa merges it into the fresh metadata (no clobbering).
-    await storeModule.updateStores(store.id, { metadata: { [KEY]: next } } as any);
+    // Spread existing metadata — Medusa REPLACES it (see lib/store-meta).
+    await setStoreMeta(scope, KEY, next);
   } catch { /* never block the stock update on history failure */ }
 }
 

@@ -1,4 +1,5 @@
 import { Modules } from "@medusajs/framework/utils";
+import { setStoreMeta } from "./store-meta";
 
 // Audit log of important admin actions (spec A-28 / AN-02). Entries are stored on
 // Store.metadata.naran_audit (capped, newest-first) AND written to the container
@@ -37,8 +38,9 @@ export async function audit(
     if (!store) return;
     const list: AuditEntry[] = Array.isArray((store.metadata as any)?.[KEY]) ? (store.metadata as any)[KEY] : [];
     const next = [full, ...list].slice(0, CAP);
-    // Only our key — Medusa merges it into the fresh metadata (no clobbering).
-    await storeModule.updateStores(store.id, { metadata: { [KEY]: next } } as any);
+    // Spread existing metadata — Medusa REPLACES it (see lib/store-meta). Writing
+    // only { naran_audit } here is what previously wiped cms_homepage.
+    await setStoreMeta(scope, KEY, next);
   } catch { /* never block the primary action on audit failure */ }
 }
 
