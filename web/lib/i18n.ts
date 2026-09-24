@@ -198,7 +198,7 @@ const en: Dict = {
   "acc.requestReturn": "Request return", "acc.returnPick": "Choose items to return", "acc.returnNote": "Reason (optional)",
   "acc.returnSubmit": "Submit request", "acc.returnSent": "Return request submitted", "acc.returnFailed": "Return could not be requested", "acc.returnRequested": "Return requested",
   // shop
-  "shop.items": "items", "shop.sort": "Sort", "shop.sortNew": "Newest", "shop.sortPriceAsc": "Price ↑",
+  "shop.items": "items", "shop.sort": "Sort", "shop.sortDefault": "Recommended", "shop.sortNew": "Newest", "shop.sortPriceAsc": "Price ↑",
   "shop.sortPriceDesc": "Price ↓", "shop.sortRating": "Top rated",
   "shop.filters": "Filters", "shop.fPrice": "Price", "shop.fTech": "Tech", "shop.min": "Min", "shop.max": "Max",
   "shop.fBrand": "Brand", "shop.fType": "Type", "shop.fSize": "Size", "shop.fGender": "For", "shop.brandSearch": "Search brands", "shop.onlyNew": "New arrivals",
@@ -392,7 +392,7 @@ const mn: Dict = {
   "acc.requestReturn": "Буцаах хүсэлт", "acc.returnPick": "Буцаах бараагаа сонго", "acc.returnNote": "Шалтгаан (заавал биш)",
   "acc.returnSubmit": "Хүсэлт илгээх", "acc.returnSent": "Буцаалтын хүсэлт илгээгдлээ", "acc.returnFailed": "Буцаалт илгээж чадсангүй", "acc.returnRequested": "Буцаалт хүссэн",
   // shop
-  "shop.items": "бараа", "shop.sort": "Эрэмбэлэх", "shop.sortNew": "Шинэ", "shop.sortPriceAsc": "Үнэ ↑",
+  "shop.items": "бараа", "shop.sort": "Эрэмбэлэх", "shop.sortDefault": "Санал болгосон", "shop.sortNew": "Шинэ", "shop.sortPriceAsc": "Үнэ ↑",
   "shop.sortPriceDesc": "Үнэ ↓", "shop.sortRating": "Үнэлгээгээр",
   "shop.filters": "Шүүлтүүр", "shop.fPrice": "Үнэ", "shop.fTech": "Технологи", "shop.min": "Доод", "shop.max": "Дээд",
   "shop.fBrand": "Брэнд", "shop.fType": "Төрөл", "shop.fSize": "Хэмжээ", "shop.fGender": "Хэрэглэгч", "shop.brandSearch": "Брэнд хайх", "shop.onlyNew": "Шинэ бараа",

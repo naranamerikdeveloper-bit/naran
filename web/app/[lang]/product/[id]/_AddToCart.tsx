@@ -64,10 +64,17 @@ export function AddToCart({ product }: { product: Product }) {
       )}
 
       <Group label={t("common.quantity")}>
-        <div className="inline-flex items-center bg-white rounded-pill border border-border p-1">
-          <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label={t("common.decrease")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2">−</button>
-          <span className="px-3.5 font-semibold min-w-[36px] text-center">{qty}</span>
-          <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label={t("common.increase")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex items-center bg-white rounded-pill border border-border p-1">
+            <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label={t("common.decrease")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2">−</button>
+            <span className="px-3.5 font-semibold min-w-[36px] text-center">{qty}</span>
+            <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label={t("common.increase")} className="w-9 h-9 rounded-full grid place-items-center hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+          </div>
+          {/* Running total = unit price × quantity, updates live with the stepper. */}
+          <div className="text-right">
+            {qty > 1 && <div className="tiny leading-none mb-0.5">{money(shownPrice)} × {qty}</div>}
+            <div className="font-display text-[22px] num-tabular leading-none">{money(shownPrice * qty)}</div>
+          </div>
         </div>
       </Group>
 
@@ -104,8 +111,8 @@ export function AddToCart({ product }: { product: Product }) {
       >
         <div className="min-w-0">
           {hasRange && !size && <div className="tiny leading-none mb-1">{t("common.from")}</div>}
-          <div className="font-display text-[18px] num-tabular leading-none">{money(shownPrice)}</div>
-          {sizable && !size && <div className="tiny mt-0.5">{t("common.size")}</div>}
+          <div className="font-display text-[18px] num-tabular leading-none">{money(shownPrice * qty)}</div>
+          {qty > 1 ? <div className="tiny mt-0.5">{money(shownPrice)} × {qty}</div> : sizable && !size ? <div className="tiny mt-0.5">{t("common.size")}</div> : null}
         </div>
         <button
           disabled={soldOut}

@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "@/components/LangProvider";
 import { TYPE_LABEL } from "@/lib/catalog";
 import type { FacetCount } from "@/lib/types";
@@ -31,24 +31,57 @@ const listOf = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
 const toggleIn = (list: string[], v: string) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
 const nf = (n: number) => new Intl.NumberFormat("mn-MN").format(n);
 
+// Custom sort dropdown (a native <select> can't be styled to match the pills).
 export function SortSelect() {
   const sp = useSearchParams();
   const t = useT();
   const setParams = useSetParams();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = sp.get("sort") ?? "";
+
+  const options: [string, string][] = [
+    ["", t("shop.sortDefault")],
+    ["new", t("shop.sortNew")],
+    ["price-asc", t("shop.sortPriceAsc")],
+    ["price-desc", t("shop.sortPriceDesc")],
+    ["name", t("shop.sortName")],
+    ["brand", t("shop.sortBrand")],
+  ];
+  const label = options.find(([v]) => v === current)?.[1] ?? t("shop.sortDefault");
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
   return (
-    <select
-      value={sp.get("sort") ?? ""}
-      onChange={(e) => setParams({ sort: e.target.value || null })}
-      aria-label={t("shop.sort")}
-      className="h-9 pl-3 pr-2 rounded-pill bg-surface-2 text-[13px] font-medium outline-none cursor-pointer border-none"
-    >
-      <option value="">{t("shop.sort")}</option>
-      <option value="new">{t("shop.sortNew")}</option>
-      <option value="price-asc">{t("shop.sortPriceAsc")}</option>
-      <option value="price-desc">{t("shop.sortPriceDesc")}</option>
-      <option value="name">{t("shop.sortName")}</option>
-      <option value="brand">{t("shop.sortBrand")}</option>
-    </select>
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
+        className={`inline-flex items-center gap-2 h-9 pl-3.5 pr-2.5 rounded-pill text-[13px] font-medium border transition ${
+          current ? "bg-accent-soft/60 border-accent/30 text-accent-deep" : "bg-surface-2 border-transparent text-ink hover:bg-surface-3"}`}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 6h13M3 12h9M3 18h5M17 8V4m0 0-3 3m3-3 3 3M17 16v4m0 0 3-3m-3 3-3-3"/></svg>
+        <span className="whitespace-nowrap">{current ? label : t("shop.sort")}</span>
+        <svg className={`transition-transform ${open ? "rotate-180" : ""}`} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      {open && (
+        <div role="listbox" className="absolute right-0 top-full mt-2 z-[60] min-w-[190px] rounded-2xl border border-line bg-white p-1.5 shadow-[0_24px_60px_-20px_rgba(10,10,11,.35)] rise-in">
+          {options.map(([v, lbl]) => {
+            const on = v === current;
+            return (
+              <button key={v || "default"} type="button" role="option" aria-selected={on}
+                onClick={() => { setParams({ sort: v || null }); setOpen(false); }}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-[13px] text-left transition-colors ${
+                  on ? "bg-accent-soft/60 text-accent-deep font-semibold" : "hover:bg-surface-2 text-ink"}`}>
+                {lbl}
+                {on && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20 6 9 17l-5-5"/></svg>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
