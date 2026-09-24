@@ -88,6 +88,22 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`rounded bg-ui-bg-component animate-pulse ${className}`} />;
 }
 
+/**
+ * Consistent empty state — an optional icon in a soft badge, a title and an
+ * optional hint. Use anywhere a list/table has no rows so every page reads the
+ * same instead of ad-hoc one-off "Хоосон" divs.
+ */
+export function EmptyState({ icon, title, hint, action }: { icon?: ReactNode; title: string; hint?: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+      {icon && <span className="mb-1 grid h-10 w-10 place-items-center rounded-full bg-ui-bg-component text-ui-fg-muted">{icon}</span>}
+      <Text size="small" weight="plus">{title}</Text>
+      {hint && <Text size="small" className="max-w-sm text-ui-fg-subtle">{hint}</Text>}
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  );
+}
+
 /** A horizontal proportion bar (value/max). */
 export function Bar({ value, max, tone = "orange", className = "" }: { value: number; max: number; tone?: string; className?: string }) {
   const pct = Math.max(2, Math.round((value / Math.max(1, max)) * 100));

@@ -1,10 +1,10 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk";
-import { ShoppingBag } from "@medusajs/icons";
+import { ShoppingBag, MagnifyingGlass } from "@medusajs/icons";
 import { Container, Text, Button, Input, Label, Select, Badge, Table, toast } from "@medusajs/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
-import { PageHeader, Panel, TableCard } from "../../lib/ui";
+import { PageHeader, Panel, TableCard, EmptyState } from "../../lib/ui";
 import { tug, PAY_LABEL, printReceipt, type Receipt } from "../../lib/receipt";
 
 type Variant = { id: string; title: string; sku: string; price: number; manage: boolean; stock: number | null };
@@ -26,6 +26,7 @@ const PAYMENTS = Object.entries(PAY_LABEL).map(([value, label]) => ({ value, lab
 
 const OfflineSalePage = () => {
   const { loading: permLoading, can } = usePermissions();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [searching, setSearching] = useState(false);
@@ -44,6 +45,8 @@ const OfflineSalePage = () => {
 
   const loadSummary = () => adminFetch("/offline-sale?summary=1").then(r => setToday(r.summary)).catch(() => {});
   useEffect(() => { loadSummary(); }, []);
+  // Focus the search box on open so the cashier can start typing/scanning at once.
+  useEffect(() => { searchRef.current?.focus(); }, []);
 
   // Debounced product search.
   useEffect(() => {
@@ -77,6 +80,15 @@ const OfflineSalePage = () => {
         unit_price: v.price, quantity: 1, max: v.manage ? (v.stock ?? 0) : null,
       }];
     });
+  };
+  // Enter in the search box adds the first in-stock variant of the top result —
+  // fast keyboard/scanner flow (type or scan a SKU, hit Enter, repeat).
+  const addTopResult = () => {
+    for (const p of results) {
+      const v = p.variants.find(v => !(v.manage && (v.stock ?? 0) <= 0));
+      if (v) { addVariant(p, v); return; }
+    }
+    if (q.trim()) toast.error("Нэмэх боломжтой бараа олдсонгүй.");
   };
   const setLine = (id: string, patch: Partial<Line>) => setLines(prev => prev.map(l => l.variant_id === id ? { ...l, ...patch } : l));
   const incLine = (l: Line) => {
@@ -136,7 +148,9 @@ const OfflineSalePage = () => {
             {today && (
               <Badge size="small" color="green">Өнөөдөр: {today.count} зарлага · {tug(today.total)}</Badge>
             )}
-            <Button variant="primary" onClick={submit} disabled={saving || !lines.length || cashShort} isLoading={saving}>Борлуулалт бүртгэх</Button>
+            <Button variant="primary" onClick={submit} disabled={saving || !lines.length || cashShort} isLoading={saving}>
+              {lines.length ? `Бүртгэх · ${tug(total)}` : "Борлуулалт бүртгэх"}
+            </Button>
           </div>
         }
       />
@@ -159,13 +173,23 @@ const OfflineSalePage = () => {
         {/* Product picker */}
         <div>
           <Label size="small" className="mb-1.5 block">Бараа хайх</Label>
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Барааны нэрээр хайх…" />
+          <Input
+            ref={searchRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTopResult(); } }}
+            placeholder="Нэр эсвэл SKU-гаар хайх… (Enter — эхнийг нэмэх)"
+          />
           <div className="mt-3 max-h-[420px] overflow-y-auto rounded-lg border border-ui-border-base divide-y divide-ui-border-base">
             {searching && results.length === 0 && (
               <div className="px-4 py-6 text-center"><Text size="small" className="text-ui-fg-subtle">Хайж байна…</Text></div>
             )}
             {!searching && results.length === 0 && (
-              <div className="px-4 py-6 text-center"><Text size="small" className="text-ui-fg-subtle">Бараа олдсонгүй.</Text></div>
+              <EmptyState
+                icon={<MagnifyingGlass />}
+                title={q.trim() ? "Бараа олдсонгүй" : "Бараа хайж эхлээрэй"}
+                hint={q.trim() ? "Өөр нэр эсвэл SKU оруулж үзнэ үү." : "Барааны нэр эсвэл SKU бичихэд энд харагдана."}
+              />
             )}
             {results.map(p => (
               <div key={p.id} className="px-4 py-3">
@@ -227,7 +251,14 @@ const OfflineSalePage = () => {
                       <Table.Cell>
                         <div className="flex items-center gap-1">
                           <button type="button" onClick={() => setLine(l.variant_id, { quantity: Math.max(1, l.quantity - 1) })} className="grid h-6 w-6 place-items-center rounded bg-ui-bg-subtle hover:bg-ui-bg-subtle-hover">−</button>
-                          <span className="w-6 text-center tabular-nums txt-compact-small">{l.quantity}</span>
+                          <input
+                            type="number" min={1} max={l.max ?? undefined} value={l.quantity}
+                            onChange={e => {
+                              const n = Math.max(1, Math.round(Number(e.target.value) || 1));
+                              if (l.max != null && n > l.max) { toast.error(`Зөвхөн ${l.max} ширхэг үлдсэн.`); setLine(l.variant_id, { quantity: l.max }); return; }
+                              setLine(l.variant_id, { quantity: n });
+                            }}
+                            className="w-10 rounded border border-ui-border-base bg-ui-bg-field py-0.5 text-center tabular-nums txt-compact-small outline-none focus:border-ui-fg-interactive" />
                           <button type="button" onClick={() => incLine(l)} disabled={l.max != null && l.quantity >= l.max} className="grid h-6 w-6 place-items-center rounded bg-ui-bg-subtle hover:bg-ui-bg-subtle-hover disabled:opacity-40 disabled:cursor-not-allowed">+</button>
                         </div>
                       </Table.Cell>

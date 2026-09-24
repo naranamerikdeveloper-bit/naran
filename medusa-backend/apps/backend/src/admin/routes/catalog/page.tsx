@@ -1,10 +1,10 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk";
-import { Tag } from "@medusajs/icons";
+import { Tag, ArrowPath } from "@medusajs/icons";
 import { Container, Text, Button, Table, Badge, Textarea, Input, toast } from "@medusajs/ui";
 import { useEffect, useRef, useState } from "react";
 import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
-import { PageHeader, StatGrid, StatCard, Panel } from "../../lib/ui";
+import { PageHeader, StatGrid, StatCard, Panel, EmptyState } from "../../lib/ui";
 
 type Stats = {
   total: number;
@@ -43,6 +43,8 @@ const CatalogPage = () => {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [savingStock, setSavingStock] = useState(false);
+  const [threshold, setThreshold] = useState(5);
+  const [refreshing, setRefreshing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadStats = async () => {
@@ -53,9 +55,9 @@ const CatalogPage = () => {
       toast.error(e.message || "Статистик ачаалж чадсангүй");
     }
   };
-  const loadLowStock = async () => {
+  const loadLowStock = async (th = threshold) => {
     try {
-      const res = await adminFetch("/catalog/low-stock?threshold=5");
+      const res = await adminFetch(`/catalog/low-stock?threshold=${th}`);
       setLowStock((await res.json()).variants || []);
     } catch { /* inventory may be off */ }
   };
@@ -65,7 +67,15 @@ const CatalogPage = () => {
       setHistory((await res.json()).moves || []);
     } catch { /* optional */ }
   };
-  useEffect(() => { loadStats(); loadLowStock(); loadHistory(); }, []);
+  useEffect(() => { loadStats(); loadHistory(); }, []);
+  // Low-stock reloads whenever the threshold changes (and on first mount).
+  useEffect(() => { loadLowStock(threshold); }, [threshold]);
+
+  const refreshAll = async () => {
+    setRefreshing(true);
+    try { await Promise.all([loadStats(), loadLowStock(threshold), loadHistory()]); }
+    finally { setRefreshing(false); }
+  };
 
   const canWrite = can("catalog.write");
 
@@ -141,7 +151,14 @@ const CatalogPage = () => {
       <PageHeader
         title="Каталог"
         description="Барааны нэгдсэн тойм + CSV импорт/экспорт (олон мянган бараанд)."
-        actions={<Button variant="secondary" size="small" onClick={runExport} isLoading={exporting}>CSV татах</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="small" onClick={refreshAll} isLoading={refreshing}>
+              <ArrowPath className="text-ui-fg-subtle" /> Сэргээх
+            </Button>
+            <Button variant="secondary" size="small" onClick={runExport} isLoading={exporting}>CSV татах</Button>
+          </div>
+        }
       />
 
       {/* Stats */}
@@ -205,12 +222,21 @@ const CatalogPage = () => {
 
       {/* Low stock */}
       <Panel
-        title="Бага нөөц (≤5)"
-        actions={<Badge color={lowStock.length ? "red" : "green"} size="2xsmall">{nf(lowStock.length)}</Badge>}
-        bodyClassName={lowStock.length === 0 ? "p-4" : ""}
+        title="Бага нөөц"
+        actions={
+          <div className="flex items-center gap-2">
+            <div className="flex overflow-hidden rounded-md border border-ui-border-base">
+              {[5, 10, 20].map(t => (
+                <button key={t} type="button" onClick={() => setThreshold(t)}
+                  className={`px-2.5 py-1 txt-compact-small ${threshold === t ? "bg-ui-bg-base-pressed font-medium" : "bg-ui-bg-subtle text-ui-fg-muted hover:bg-ui-bg-subtle-hover"}`}>≤{t}</button>
+              ))}
+            </div>
+            <Badge color={lowStock.length ? "red" : "green"} size="2xsmall">{nf(lowStock.length)}</Badge>
+          </div>
+        }
       >
         {lowStock.length === 0 ? (
-          <Text className="text-ui-fg-subtle" size="small">Бага нөөцтэй бараа алга.</Text>
+          <EmptyState title={`Бага нөөцтэй бараа алга (≤${threshold})`} hint="Бүх хувилбар хангалттай нөөцтэй байна." />
         ) : (
           <Table>
             <Table.Header>
@@ -267,10 +293,9 @@ const CatalogPage = () => {
       <Panel
         title="Нөөцийн хөдөлгөөний түүх"
         actions={<Badge size="2xsmall" color="grey">{nf(history.length)}</Badge>}
-        bodyClassName={history.length === 0 ? "p-4" : ""}
       >
         {history.length === 0 ? (
-          <Text className="text-ui-fg-subtle" size="small">Хөдөлгөөн бүртгэгдээгүй байна.</Text>
+          <EmptyState title="Хөдөлгөөн бүртгэгдээгүй байна" hint="Нөөц шинэчлэх бүрт өөрчлөлт энд бүртгэгдэнэ." />
         ) : (
           <Table>
             <Table.Header>
