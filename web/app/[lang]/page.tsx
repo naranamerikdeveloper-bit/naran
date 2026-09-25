@@ -19,19 +19,6 @@ import { alternatesFor } from "@/lib/seo";
 
 export const revalidate = 300;
 
-// Category bento candidates, in display order: fragrance types first (almost
-// the whole catalog is fragrance), then non-fragrance categories. Only the
-// populated ones are shown.
-const TILES: { kind: "type" | "cat"; key: string; label: string; href: string }[] = [
-  { kind: "type", key: "EDP",     label: "nav.edp",  href: "/shop?type=EDP" },
-  { kind: "type", key: "EDT",     label: "nav.edt",  href: "/shop?type=EDT" },
-  { kind: "cat",  key: "Body",    label: "cat.Body", href: "/shop?category=Body" },
-  { kind: "cat",  key: "Gift",    label: "cat.Gift", href: "/shop?category=Gift" },
-  { kind: "type", key: "Parfum",  label: "home.tParfum", href: "/shop?type=Parfum" },
-  { kind: "type", key: "Extrait", label: "home.tExtrait", href: "/shop?type=Extrait" },
-  { kind: "type", key: "Cologne", label: "home.tCologne", href: "/shop?type=Cologne" },
-];
-
 export function generateMetadata({ params }: { params: { lang: Lang } }): Metadata {
   return { alternates: alternatesFor(params.lang) };
 }
@@ -59,26 +46,30 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
   const hot = products.find(p => p.badge === "Sale") || products[0];
   const hotImg = hot ? (hot.image ?? productImg(hot.id)) : HERO_IMG;
 
-  // Category bento: live counts + a real product photo per tile.
+  // Category bento now mirrors the shop's audience categories: a Women feature
+  // (the largest audience) + Men / New arrivals / Gift set tiles. Counts and a
+  // real product photo come from the live catalog; empty categories are skipped
+  // (e.g. no gift products yet) so a tile never opens onto a blank page.
   const facets = productsRes.facets;
-  const countOf = (kind: "type" | "cat", key: string) =>
-    (kind === "type" ? facets?.types : facets?.categories)?.find(f => f.key === key)?.count ?? 0;
-  const picOf = (kind: "type" | "cat", key: string) =>
-    products.find(p => p.image && (kind === "type" ? p.fragranceType === key : p.category === key))?.image;
+  const genderCount = (k: string) => facets?.genders?.find(g => g.key === k)?.count ?? 0;
+  const imgByGender = (tag: string) => products.find(p => p.image && p.genderTag === tag)?.image;
+  const imgGift = products.find(p => p.image && (p.fragranceType === "Set" || p.category === "Gift"))?.image;
   const brandTotal = facets?.brands.length ?? 0;
+  const newCount = facets?.newCount ?? 0;
   const catFeature = {
-    label: t("home.shopAll"),
-    sub: `${products.length} ${t("home.items")}${brandTotal ? ` · ${brandTotal} ${t("home.brands")}` : ""}`,
-    href: "/shop",
-    img: HERO_IMG,
+    label: t("gender.women"),
+    sub: `${genderCount("women")} ${t("home.items")}${brandTotal ? ` · ${brandTotal} ${t("home.brands")}` : ""}`,
+    href: "/shop?gender=women",
+    img: imgByGender("Women") ?? HERO_IMG,
   };
-  const catTiles = TILES
-    .map(c => ({ ...c, n: countOf(c.kind, c.key) }))
-    // A tile needs a few products to be worth a click (a 1-item "Body care"
-    // tile looked empty); smaller categories stay reachable from the shop.
-    .filter(c => c.n >= 3)
-    .slice(0, 3)
-    .map(c => ({ label: t(c.label), sub: `${c.n} ${t("home.items")}`, href: c.href, img: picOf(c.kind, c.key) }));
+  const catTiles: { label: string; sub: string; href: string; img?: string }[] = [];
+  if (genderCount("men") > 0)
+    catTiles.push({ label: t("gender.men"), sub: `${genderCount("men")} ${t("home.items")}`, href: "/shop?gender=men", img: imgByGender("Men") });
+  // New arrivals is a core entry — sort=new always has content, so it's always shown.
+  catTiles.push({ label: t("nav.new"), sub: newCount > 0 ? `${newCount} ${t("home.items")}` : t("home.justDropped"), href: "/shop?sort=new", img: newest[0]?.image });
+  if (genderCount("gift") > 0)
+    catTiles.push({ label: t("gender.gift"), sub: `${genderCount("gift")} ${t("home.items")}`, href: "/shop?gender=gift", img: imgGift });
+  catTiles.splice(3);
 
   const defaultSlides: Slide[] = [
     { kicker: t("home.s1Kicker"), top: t("home.s1Top"), accent: t("home.s1Accent"), desc: t("home.s1Desc"), img: FILM_IMG, href: "/shop" },
