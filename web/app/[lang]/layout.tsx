@@ -44,11 +44,16 @@ export function generateStaticParams() {
 // headings use Onest — the closest geometric face with full Cyrillic incl. Ү/Ө
 // (U+04AE/U+04E8, cyrillic-ext). The CSS stack is Outfit → Onest, so each script
 // gets a matching glyph instead of falling back to a system font.
-const outfit = Outfit({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
-const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["400", "500", "600", "700", "800"], variable: "--font-onest", display: "swap" });
+// Headings only ever render at 600–800 (see globals.css .h-*/.hd-*), so 400/500
+// are dropped from the display faces — fewer preloaded woff2 files, faster LCP.
+// The store is primarily Mongolian, so the Cyrillic display face (Onest) and the
+// body face (Inter) are the only ones preloaded; Outfit (Latin headings) and the
+// mono face load on demand via display:swap instead of blocking first paint.
+const outfit = Outfit({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-outfit", display: "swap", preload: false });
+const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["600", "700", "800"], variable: "--font-onest", display: "swap" });
 // Body: Inter, with cyrillic-ext for Ү/Ө.
 const inter = Inter({ subsets: ["latin", "cyrillic", "cyrillic-ext"], weight: ["400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains", display: "swap", preload: false });
 
 export default function LangLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
   if (!isLang(params.lang)) notFound();

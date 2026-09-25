@@ -201,6 +201,24 @@ curl -s -X POST http://meilisearch:7700/indexes/products/search \
   өмнө staging дээр ажиллуулж p95<800ms, алдаа<1% хангаж буйг шалга.
 - **Шинэчлэлт**: Git-д push → Dokploy → Redeploy. Migration нь `medusa-migrate`
   one-shot контейнерт нэг удаа ажиллана (server/worker хүлээгээд эхэлнэ).
+
+> 🚨 **ЗААВАЛ Dokploy-ээр deploy хий — гараар `docker compose` бү ажиллуул.**
+> Домэйний routing (`api.naranamerikbaraa.mn` → medusa)-ийг Traefik нь **контейнерийн
+> label**-аар олдог. Эдгээр label-ыг **Dokploy deploy үедээ өөрөө нэмдэг** бөгөөд
+> git доторх `docker-compose.prod.yml`-д байдаггүй. Тиймээс сервер дээр гараар
+> `docker compose ... up -d --force-recreate medusa` гэх мэт ажиллуулбал label
+> арчигдаж, `api.naranamerikbaraa.mn` **404** болно (сайт бараагаа татахгүй,
+> нэвтрэлт унтарна — өгөгдөл БУС, зөвхөн "хаалга" хаагдана).
+>
+> **Код шинэчлэх** (backend/admin/web бүгд): Dokploy UI → `naran-stack` → **Redeploy**.
+> Энэ нь git-ээс дахин build хийж, routing label-ыг зөв сэргээнэ.
+>
+> **Хэрэв routing гэнэт унтарвал** (гараар compose ажиллуулсны дараа): Dokploy →
+> **Redeploy** дарахад л засагдана. Шалгах:
+> ```bash
+> curl -s -o /dev/null -w "%{http_code}\n" https://api.naranamerikbaraa.mn/app   # 200 байх ёстой
+> docker exec dokploy-traefik wget -qO- http://localhost:8080/api/http/routers | grep -o api.naranamerikbaraa.mn   # router бүртгэгдсэн эсэх
+> ```
 - **Лог**: Dokploy → сервис → Logs.
 - **Хэмжээ / server-worker split**: compose нь Medusa-г **хоёр контейнер**-аар
   ажиллуулна — `medusa` (HTTP, `MEDUSA_WORKER_MODE=server`) + `medusa-worker`
