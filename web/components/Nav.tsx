@@ -111,7 +111,7 @@ export function Nav() {
         {/* Links wrap onto a clipped second line when space runs out, so a link
             either shows whole or not at all — never squeezes the logo. */}
         <div className="flex flex-wrap items-start gap-x-5 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
-          {[["/shop","nav.shop",true],["/shop?category=Fragrance","cat.Fragrance",false],["/shop?type=EDP","nav.edp",false],["/shop?type=EDT","nav.edt",false]].map(([h,k,pri]) => (
+          {[["/shop?gender=men","nav.men",true],["/shop?gender=women","nav.women",true],["/shop?sort=new","nav.new",false],["/shop?gender=gift","gender.gift",false]].map(([h,k,pri]) => (
             <Link key={k as string} href={h as string}
               aria-current={localPath === h ? "page" : undefined}
               className={`relative whitespace-nowrap text-[12px] uppercase tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${pri ? "inline-flex" : "hidden xl:inline-flex"} ${localPath===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k as string)}</Link>

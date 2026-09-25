@@ -46,6 +46,7 @@ const BulkEditPage = () => {
   const [setPrice, setSetPrice] = useState("");
   const [catAdd, setCatAdd] = useState("");
   const [catRemove, setCatRemove] = useState("");
+  const [setGender, setSetGender] = useState("");
 
   useEffect(() => {
     adminFetch("/product-categories?limit=100&fields=id,name")
@@ -80,8 +81,8 @@ const BulkEditPage = () => {
   });
 
   const hasChange = useMemo(
-    () => setStatus || setPrice.trim() || catAdd || catRemove,
-    [setStatus, setPrice, catAdd, catRemove],
+    () => setStatus || setPrice.trim() || catAdd || catRemove || setGender,
+    [setStatus, setPrice, catAdd, catRemove, setGender],
   );
 
   const apply = async () => {
@@ -91,6 +92,7 @@ const BulkEditPage = () => {
     if (setPrice.trim()) set.price = Number(setPrice);
     if (catAdd) set.category_add = catAdd;
     if (catRemove) set.category_remove = catRemove;
+    if (setGender) set.gender = setGender;
     setBusy(true);
     try {
       const r = await adminFetch("/catalog/bulk-edit", {
@@ -100,7 +102,7 @@ const BulkEditPage = () => {
       const parts = Object.keys(r.applied || {});
       toast.success(`${nf(r.count)} бараанд хэрэгжлээ: ${parts.join(", ") || "—"}`);
       if (r.errors) toast.warning(`Алдаа: ${Object.keys(r.errors).join(", ")}`);
-      setSetStatus(""); setSetPrice(""); setCatAdd(""); setCatRemove("");
+      setSetStatus(""); setSetPrice(""); setCatAdd(""); setCatRemove(""); setSetGender("");
       setSelected(new Set());
       await load(offset);
     } catch (e: any) {
@@ -193,6 +195,20 @@ const BulkEditPage = () => {
                 <Select.Trigger><Select.Value placeholder="—" /></Select.Trigger>
                 <Select.Content>
                   {cats.map((c) => <Select.Item key={c.id} value={c.id}>{c.name}</Select.Item>)}
+                </Select.Content>
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label size="small">Хүйс (Эр/Эм)</Label>
+            <div className="w-[150px]">
+              <Select size="small" value={setGender} onValueChange={setSetGender}>
+                <Select.Trigger><Select.Value placeholder="Өөрчлөхгүй" /></Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="Women">Эмэгтэй</Select.Item>
+                  <Select.Item value="Men">Эрэгтэй</Select.Item>
+                  <Select.Item value="Unisex">Юнисекс</Select.Item>
+                  <Select.Item value="none">Арилгах</Select.Item>
                 </Select.Content>
               </Select>
             </div>

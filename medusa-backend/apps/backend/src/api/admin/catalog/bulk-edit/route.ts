@@ -1,4 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import { Modules } from "@medusajs/framework/utils";
 import {
   updateProductsWorkflow,
   updateProductVariantsWorkflow,
@@ -78,6 +79,28 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       applied.category_remove = set.category_remove;
     } catch (e: any) {
       errors.category_remove = e?.message || "category remove failed";
+    }
+  }
+
+  // Gender (metadata.gender = Men | Women | Unisex, or "none" to clear). Drives
+  // the storefront's Эр/Эм shop filter + nav. Medusa REPLACES a product's
+  // metadata on update, so we read each product's current metadata and merge the
+  // one key (keeping badge / fragrance_type etc.).
+  const GENDERS = new Set(["Men", "Women", "Unisex", "none"]);
+  if (set.gender && GENDERS.has(String(set.gender))) {
+    const g = String(set.gender);
+    try {
+      const productModule = req.scope.resolve(Modules.PRODUCT);
+      const current: any[] = await productModule.listProducts({ id: ids }, { select: ["id", "metadata"] as any });
+      const products = current.map((p) => {
+        const meta = { ...((p.metadata as any) || {}) };
+        if (g === "none") delete meta.gender; else meta.gender = g;
+        return { id: p.id, metadata: meta };
+      });
+      await updateProductsWorkflow(req.scope).run({ input: { products } as any });
+      applied.gender = g;
+    } catch (e: any) {
+      errors.gender = e?.message || "gender update failed";
     }
   }
 

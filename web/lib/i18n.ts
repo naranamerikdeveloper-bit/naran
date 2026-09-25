@@ -8,7 +8,7 @@ type Dict = Record<string, string>;
 
 const en: Dict = {
   // nav
-  "nav.shop": "Shop", "nav.men": "Men", "nav.women": "Women", "nav.trending": "Trending",
+  "nav.shop": "Shop", "nav.men": "Men", "nav.women": "Women", "nav.new": "New Arrivals", "nav.trending": "Trending",
   "nav.seasonal": "Seasonal", "nav.accessories": "Accessories",
   "nav.search": "Search the collection…", "nav.searchShort": "Search…", "nav.signin": "Sign in",
   "search.none": "No products match", "search.all": "See all results", "common.clear": "Clear",
@@ -212,7 +212,7 @@ const en: Dict = {
 };
 
 const mn: Dict = {
-  "nav.shop": "Дэлгүүр", "nav.men": "Эрэгтэй", "nav.women": "Эмэгтэй", "nav.trending": "Тренд",
+  "nav.shop": "Дэлгүүр", "nav.men": "Эрэгтэй", "nav.women": "Эмэгтэй", "nav.new": "Шинэ ирсэн", "nav.trending": "Тренд",
   "nav.seasonal": "Улирлын", "nav.accessories": "Хэрэгсэл",
   "nav.search": "Бараа хайх…", "nav.searchShort": "Хайх…", "nav.signin": "Нэвтрэх",
   "search.none": "Тохирох бараа олдсонгүй:", "search.all": "Бүх үр дүнг харах", "common.clear": "Арилгах",
