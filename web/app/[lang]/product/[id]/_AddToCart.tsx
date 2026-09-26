@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart, useToast, useUI, flyToCart } from "@/lib/store";
+import { useCart, useToast, useUI, useVariantImage, flyToCart } from "@/lib/store";
 import { useT, useLang } from "@/components/LangProvider";
 import { money } from "@/lib/api";
 import { ArrowUpRight, ArrowRight } from "@/components/Icons";
@@ -29,6 +29,14 @@ export function AddToCart({ product }: { product: Product }) {
   const maxQty = Math.max(1, Math.min(99, size ? sizeStock(size) : 99));
   // Changing size can lower the limit — keep the stepper honest.
   useEffect(() => { setQty(q => Math.min(q, maxQty)); }, [maxQty]);
+
+  // Show the chosen size's own photo in the gallery (when the admin set one).
+  const setVariantImage = useVariantImage(s => s.set);
+  useEffect(() => {
+    const v = product.variants?.find(x => x.size === size);
+    setVariantImage(v?.image ?? null);
+    return () => setVariantImage(null); // never leak onto the next product
+  }, [size, product.id, product.variants, setVariantImage]);
 
   function handleAdd(src?: HTMLElement | null, then?: () => void) {
     if (soldOut) { showToast(t("common.soldOut")); return; }

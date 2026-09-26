@@ -29,7 +29,9 @@ export type Product = {
   images?: string[];
   // `price` is the variant's own price (sizes of one perfume differ: 50ml vs
   // 150ml). Product.price is the lowest of them — a "from" price.
-  variants?: { id: string; size: string; stock: number; price?: number }[];
+  // `image` is an optional per-size photo (variant.metadata.image) — selecting
+  // that size swaps the gallery to it.
+  variants?: { id: string; size: string; stock: number; price?: number; image?: string }[];
   brand?: string;
   // EDP | EDT | Parfum | Extrait | Cologne | Mist | Set (metadata.fragrance_type)
   fragranceType?: string;

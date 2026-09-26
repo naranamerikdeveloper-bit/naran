@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Photo } from "@/components/Photo";
 import { ProductVisual } from "@/components/ProductVisual";
 import { ChevronLeft } from "@/components/Icons";
 import type { Product } from "@/lib/types";
 import { useT } from "@/components/LangProvider";
+import { useVariantImage } from "@/lib/store";
 
 const clamp = (n: number) => Math.min(100, Math.max(0, n));
 const ease: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
@@ -25,7 +26,13 @@ const slideV = {
 // with the framer slide on the outer layer.
 export function Gallery({ product, img }: { product: Product; img: string }) {
   const t = useT();
-  const imgs = product.images?.length ? product.images : [img];
+  // A size can carry its own photo (admin → Хувилбарын зураг). When one is
+  // chosen it joins the gallery (first) and the view jumps straight to it.
+  const variantImage = useVariantImage(s => s.image);
+  const imgs = useMemo(() => {
+    const base = product.images?.length ? product.images : [img];
+    return variantImage && !base.includes(variantImage) ? [variantImage, ...base] : base;
+  }, [product.images, img, variantImage]);
   const many = imgs.length > 1;
   const ref = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -34,6 +41,15 @@ export function Gallery({ product, img }: { product: Product; img: string }) {
   const [pos, setPos] = useState({ x: 50, y: 50 });
   const [canHover, setCanHover] = useState(true);
   useEffect(() => { setCanHover(window.matchMedia("(hover: hover)").matches); }, []);
+
+  // Jump straight to the chosen size's photo, and never leave the index past
+  // the end when that photo disappears again.
+  useEffect(() => {
+    if (!variantImage) return;
+    const i = imgs.indexOf(variantImage);
+    if (i >= 0) { setDir(0); setIndex(i); }
+  }, [variantImage, imgs]);
+  useEffect(() => { setIndex(i => (i >= imgs.length ? 0 : i)); }, [imgs.length]);
 
   const current = imgs[index];
   const go = (next: number) => {

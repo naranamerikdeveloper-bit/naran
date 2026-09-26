@@ -166,7 +166,10 @@ function map(m: any): Product {
     // show), not its title — titles can differ ("50ml" vs "Chance 50ml"), and a
     // mismatch picked the wrong variant, price and stock.
     const size = (sizeOpt && (v.options || []).find((o: any) => o.option_id === sizeOpt.id)?.value) || v.title;
-    return { id: v.id, size, stock: variantStock(v), price: typeof amt === "number" ? Math.round(amt) : undefined };
+    // Optional per-size photo (admin → Хувилбарын зураг), stored on the variant's
+    // metadata. Picking that size swaps the gallery to its own picture.
+    const vImg = typeof v?.metadata?.image === "string" && /^https?:\/\//i.test(v.metadata.image) ? v.metadata.image : undefined;
+    return { id: v.id, size, stock: variantStock(v), price: typeof amt === "number" ? Math.round(amt) : undefined, image: vImg };
   });
   const stock = variants.reduce((a: number, v: any) => a + v.stock, 0);
   // Real gallery images: thumbnail first, then any product images (de-duped).

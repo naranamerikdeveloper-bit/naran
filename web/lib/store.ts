@@ -88,6 +88,15 @@ export const useUI = create<UIState>(set => ({
   closeCart: () => set({ cartOpen: false }),
 }));
 
+// Per-size photo on the product page: the size buttons live in AddToCart while
+// the gallery is a sibling, so the chosen variant's own image is shared here
+// (null = fall back to the product's gallery).
+type VariantImageState = { image: string | null; set: (image: string | null) => void };
+export const useVariantImage = create<VariantImageState>(set => ({
+  image: null,
+  set: image => set({ image }),
+}));
+
 // Quick-view modal: holds the product being previewed (null = closed).
 type QuickViewState = { product: Product | null; open: (p: Product) => void; close: () => void };
 export const useQuickView = create<QuickViewState>(set => ({

@@ -156,6 +156,9 @@ export default defineMiddlewares({
     { matcher: "/admin/api-keys", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/api-keys/*", methods: ["POST", "DELETE"], middlewares: [requirePermission("team.manage")] },
 
+    // Per-variant images (Хувилбарын зураг) write through the core variant route.
+    { matcher: "/admin/products/:id/variants/:variantId", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
+
     // --- Admin file uploads ---
     { matcher: "/admin/uploads", methods: ["POST"], middlewares: [guardUpload] },
     { matcher: "/admin/uploads/presigned-urls", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
