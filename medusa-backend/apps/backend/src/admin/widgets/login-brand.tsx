@@ -1,31 +1,16 @@
 import { defineWidgetConfig } from "@medusajs/admin-sdk";
-
-// NARAN sun mark — white on the warm brand gradient badge.
-const Sun = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-    <circle cx="12" cy="12" r="4.2" fill="#fff" stroke="none" />
-    <path d="M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5 19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5 19 5" />
-  </svg>
-);
+import naranLogo from "../assets/naran-logo.png";
 
 /**
  * NARAN sign-in header. The default Medusa logo + "Welcome to Medusa" heading are
- * hidden via CSS (see brand-theme.tsx) so this becomes the login hero: a large
- * sun logo, the NARAN wordmark, and a Mongolian welcome line.
+ * hidden via CSS (see brand-theme.tsx) so this becomes the login hero: the real
+ * shop wordmark and a Mongolian welcome line.
  */
 const LoginBrand = () => {
   return (
-    <div className="mb-6 flex flex-col items-center gap-3.5 text-center">
-      <span
-        className="grid h-16 w-16 place-items-center rounded-[1.35rem] shadow-[0_14px_30px_-8px_rgba(211,90,76,.6)]"
-        style={{ background: "linear-gradient(135deg,#F4A597 0%,#D35A4C 100%)" }}
-      >
-        <Sun />
-      </span>
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-ui-fg-base text-[30px] font-semibold leading-none tracking-tight">NARAN</span>
-        <span className="text-ui-fg-subtle txt-compact-small">Гоо сайхны удирдлагын самбар</span>
-      </div>
+    <div className="mb-6 flex flex-col items-center gap-3 text-center">
+      <img src={naranLogo} alt="Naran Amerik Baraa" className="h-16 w-auto" />
+      <span className="text-ui-fg-subtle txt-compact-small">Гоо сайхны удирдлагын самбар</span>
       <span className="text-ui-fg-muted txt-compact-small">Үргэлжлүүлэхийн тулд нэвтэрнэ үү</span>
     </div>
   );

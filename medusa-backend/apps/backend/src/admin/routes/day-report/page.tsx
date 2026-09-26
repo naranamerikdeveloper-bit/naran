@@ -6,6 +6,7 @@ import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
 import { PageHeader, Panel, TableCard } from "../../lib/ui";
 import { tug, PAY_LABEL, printReceipt } from "../../lib/receipt";
+import naranLogo from "../../assets/naran-logo.png";
 
 type Sale = {
   no: string; at: string; payment: string; customerName: string | null;
@@ -114,7 +115,7 @@ const DayReportPage = () => {
                     <Table.Cell className="text-right tabular-nums font-medium">{tug(s.total)}</Table.Cell>
                     <Table.Cell className="text-right">
                       <button type="button"
-                        onClick={() => printReceipt({ ...s, subtotal: s.total + (s.discount || 0), paymentMethod: s.payment })}
+                        onClick={() => printReceipt({ ...s, subtotal: s.total + (s.discount || 0), paymentMethod: s.payment }, naranLogo)}
                         className="text-ui-fg-interactive txt-compact-small hover:underline">Баримт</button>
                     </Table.Cell>
                   </Table.Row>

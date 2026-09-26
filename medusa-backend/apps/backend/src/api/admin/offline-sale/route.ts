@@ -99,6 +99,10 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       thumbnail: p.thumbnail || "",
       brand: meta.brand || p.subtitle || "",
       gender: typeof meta.gender === "string" ? meta.gender : "",
+      // Same signals the storefront uses for its "Шинэ ирсэн" / "Бэлгийн багц"
+      // nav, so the POS can offer exactly the same categories.
+      isNew: meta.badge === "New",
+      isGift: meta.fragrance_type === "Set" || (p.categories || []).some((c: any) => c.handle === "gift"),
       categories: (p.categories || []).map((c: any) => ({ id: c.id, name: c.name, handle: c.handle })),
       variants: (p.variants || []).map((v: any) => {
         const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);

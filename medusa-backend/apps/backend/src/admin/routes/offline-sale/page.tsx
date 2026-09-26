@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
 import { tug, PAY_LABEL, printReceipt, type Receipt } from "../../lib/receipt";
+import naranLogo from "../../assets/naran-logo.png";
 
 /**
  * NARAN POS — a full-screen point-of-sale for the shop floor.
@@ -27,16 +28,9 @@ const BRAND = {
   page: "#FDF8F6",
 };
 
-const Sun = ({ size = 22 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-    <circle cx="12" cy="12" r="4.2" fill="#fff" stroke="none" />
-    <path d="M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5 19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5 19 5" />
-  </svg>
-);
-
 type Variant = { id: string; title: string; sku: string; price: number; manage: boolean; stock: number | null };
 type Category = { id: string; name: string; handle: string };
-type Product = { id: string; title: string; thumbnail: string; brand: string; gender: string; categories: Category[]; variants: Variant[] };
+type Product = { id: string; title: string; thumbnail: string; brand: string; gender: string; isNew?: boolean; isGift?: boolean; categories: Category[]; variants: Variant[] };
 // `max` = stock cap (null = unlimited / not tracked).
 type Line = { variant_id: string; title: string; unit_price: number; quantity: number; max: number | null };
 type BankUrl = { name?: string; description?: string; logo?: string; link: string };
@@ -61,11 +55,14 @@ const PAYMENTS: { value: string; label: string; icon: string }[] = [
   { value: "transfer", label: PAY_LABEL.transfer, icon: "⇄" },
 ];
 
-const AUDIENCES: { key: string; label: string }[] = [
-  { key: "all", label: "Бүгд" },
-  { key: "Women", label: "Эмэгтэй" },
-  { key: "Men", label: "Эрэгтэй" },
-  { key: "Unisex", label: "Юнисекс" },
+// Exactly the storefront's nav categories, so the shop floor and the website
+// speak the same language (Эрэгтэй · Эмэгтэй · Шинэ ирсэн · Бэлгийн багц).
+const FILTERS: { key: string; label: string; match: (p: Product) => boolean }[] = [
+  { key: "all", label: "Бүгд", match: () => true },
+  { key: "men", label: "Эрэгтэй", match: p => p.gender === "Men" },
+  { key: "women", label: "Эмэгтэй", match: p => p.gender === "Women" },
+  { key: "new", label: "Шинэ ирсэн", match: p => !!p.isNew },
+  { key: "gift", label: "Бэлгийн багц", match: p => !!p.isGift },
 ];
 
 const stockOf = (v: Variant) => (v.manage ? (v.stock ?? 0) : null);
@@ -79,8 +76,7 @@ const OfflineSalePage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState("all");
-  const [audience, setAudience] = useState("all");
+  const [filter, setFilter] = useState("all");
   const [pick, setPick] = useState<Record<string, string>>({});
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -135,22 +131,18 @@ const OfflineSalePage = () => {
     return () => { stop = true; clearInterval(timer); };
   }, [qpay, qpayStatus]);
 
-  const categories = useMemo(() => {
-    const m = new Map<string, { handle: string; name: string; n: number }>();
-    for (const p of products) {
-      for (const c of p.categories || []) {
-        const e = m.get(c.handle) || { handle: c.handle, name: c.name, n: 0 };
-        e.n++; m.set(c.handle, e);
-      }
-    }
-    return [...m.values()].sort((a, b) => b.n - a.n);
+  // Live count per storefront category, so the cards show real numbers.
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const f of FILTERS) out[f.key] = products.filter(f.match).length;
+    return out;
   }, [products]);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const active = FILTERS.find(f => f.key === filter) || FILTERS[0];
     return products.filter(p => {
-      if (cat !== "all" && !(p.categories || []).some(c => c.handle === cat)) return false;
-      if (audience !== "all" && p.gender !== audience) return false;
+      if (!active.match(p)) return false;
       if (!needle) return true;
       return (
         p.title.toLowerCase().includes(needle) ||
@@ -158,7 +150,7 @@ const OfflineSalePage = () => {
         p.variants.some(v => (v.sku || "").toLowerCase().includes(needle))
       );
     });
-  }, [products, q, cat, audience]);
+  }, [products, q, filter]);
 
   if (!permLoading && !can("orders.write")) {
     return <AccessDenied title="Кассын систем (POS)" perm="orders.write" />;
@@ -295,15 +287,9 @@ const OfflineSalePage = () => {
       {/* ---------- Top bar ---------- */}
       <header className="flex shrink-0 items-center gap-4 border-b border-ui-border-base bg-white px-5 py-3">
         <div className="flex shrink-0 items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl shadow-[0_10px_22px_-8px_rgba(211,90,76,.55)]" style={{ background: BRAND.grad }}>
-            <Sun />
-          </span>
-          <div>
-            <div className="text-[18px] font-semibold leading-none tracking-tight">
-              NARAN <span style={{ color: BRAND.deep }}>POS</span>
-            </div>
-            <div className="mt-1 text-[10.5px] uppercase tracking-[.18em] text-ui-fg-muted">Кассын систем</div>
-          </div>
+          <img src={naranLogo} alt="Naran Amerik Baraa" className="h-11 w-auto" />
+          <span className="rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.16em]"
+            style={{ background: BRAND.soft, color: BRAND.deep }}>POS</span>
         </div>
 
         <div className="relative mx-auto w-full max-w-2xl">
@@ -334,29 +320,12 @@ const OfflineSalePage = () => {
       {/* ---------- Body ---------- */}
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          {/* Category cards */}
-          <div className="flex shrink-0 gap-2.5 overflow-x-auto px-5 pt-4 pb-1">
-            <CatCard active={cat === "all"} onClick={() => setCat("all")} name="Бүгд" n={products.length} />
-            {categories.map(c => (
-              <CatCard key={c.handle} active={cat === c.handle} onClick={() => setCat(c.handle)} name={c.name} n={c.n} />
+          {/* Categories — identical to the storefront's nav */}
+          <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto px-5 pt-4 pb-3">
+            {FILTERS.map(f => (
+              <CatCard key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} name={f.label} n={counts[f.key] ?? 0} />
             ))}
-          </div>
-
-          {/* Audience chips */}
-          <div className="flex shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-            {AUDIENCES.map(a => {
-              const on = audience === a.key;
-              return (
-                <button key={a.key} type="button" onClick={() => setAudience(a.key)}
-                  className="rounded-full border px-4 py-1.5 text-[13px] font-medium transition"
-                  style={on
-                    ? { background: BRAND.soft, color: BRAND.deep, borderColor: BRAND.accent }
-                    : { background: "#fff", color: "#6B7280", borderColor: "rgba(0,0,0,.08)" }}>
-                  {a.label}
-                </button>
-              );
-            })}
-            <span className="ml-auto text-[12px] tabular-nums text-ui-fg-muted">{visible.length} бараа</span>
+            <span className="ml-auto shrink-0 pl-3 text-[12px] tabular-nums text-ui-fg-muted">{visible.length} бараа</span>
           </div>
 
           {/* Product grid */}
@@ -612,7 +581,7 @@ const OfflineSalePage = () => {
               <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: BRAND.soft }}>
                 <span className="text-[12px]" style={{ color: BRAND.deep }}>Сүүлд: <b>{last.no}</b> · {tug(last.total)}</span>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => printReceipt(last)} className="text-[12px] font-semibold" style={{ color: BRAND.deep }}>Баримт</button>
+                  <button type="button" onClick={() => printReceipt(last, naranLogo)} className="text-[12px] font-semibold" style={{ color: BRAND.deep }}>Баримт</button>
                   <button type="button" onClick={() => setLast(null)} className="text-[12px] text-ui-fg-muted">Хаах</button>
                 </div>
               </div>
@@ -627,7 +596,7 @@ const OfflineSalePage = () => {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl" style={{ background: BRAND.grad }}><Sun size={18} /></span>
+                <img src={naranLogo} alt="Naran Amerik Baraa" className="h-9 w-auto" />
                 <div>
                   <div className="text-[17px] font-semibold">QPay-ээр төлөх</div>
                   <div className="mt-0.5 text-[13px] text-ui-fg-subtle">Худалдан авагч QR-ыг уншуулна уу</div>
@@ -647,20 +616,6 @@ const OfflineSalePage = () => {
                 </div>
               )}
             </div>
-
-            {qpay.urls?.length > 0 && (
-              <div className="mt-4">
-                <div className="mb-2 text-[12px] font-medium text-ui-fg-subtle">Банкны аппаар нээх</div>
-                <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto">
-                  {qpay.urls.map((u, i) => (
-                    <a key={i} href={u.link} target="_blank" rel="noreferrer"
-                      className="truncate rounded-lg border px-3 py-2 text-[12.5px] hover:bg-ui-bg-subtle" style={{ borderColor: "rgba(0,0,0,.1)" }}>
-                      {u.name || u.description || "Банк"}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="mt-5 flex items-center justify-between gap-3">
               <span className={`flex items-center gap-2 text-[13px] ${qpayStatus === "failed" ? "text-ui-tag-red-text" : "text-ui-fg-subtle"}`}>
