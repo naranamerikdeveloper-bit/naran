@@ -4,7 +4,7 @@ import { LocaleLink as Link } from "@/components/LocaleLink";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { SearchIcon, BagIcon, UserIcon, HeartIcon } from "./Icons";
+import { SearchIcon, BagIcon, UserIcon, HeartIcon, ArrowUpRight } from "./Icons";
 import { useAuth, useCart, useWish, useUI } from "@/lib/store";
 import { useT, useLang } from "./LangProvider";
 import { LangToggle } from "./LangToggle";
@@ -26,6 +26,15 @@ function CountBadge({ count }: { count: number }) {
     </AnimatePresence>
   );
 }
+
+// The storefront's audience categories — shared by the desktop pill and the
+// mobile drawer so both always show the same four entries.
+const NAV_LINKS: [string, string][] = [
+  ["/shop?gender=men", "nav.men"],
+  ["/shop?gender=women", "nav.women"],
+  ["/shop?sort=new", "nav.new"],
+  ["/shop?gender=gift", "gender.gift"],
+];
 
 export function Nav() {
   const pathname = usePathname();
@@ -49,6 +58,19 @@ export function Nav() {
   const wishCount = mounted ? wishIds.length : 0;
   const t = useT();
   const lang = useLang();
+
+  // Mobile category drawer (slides in from the left). Closes on navigation and
+  // locks background scroll while open.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
 
 
   // Keyboard: Cmd/Ctrl+K or "/" focuses the visible search input.
@@ -89,7 +111,16 @@ export function Nav() {
       {/* ---------- Mobile bar ---------- */}
       <div className="lg:hidden">
         <div className="flex items-center gap-2">
-          <Link href="/" aria-label="NARAN" className="shrink-0 -ml-0.5 mr-auto"><Logo priority className="h-10"/></Link>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label={t("nav.menu")}
+            aria-expanded={menuOpen}
+            className="shrink-0 grid place-items-center w-10 h-10 rounded-full bg-white/70 border border-black/[.06] text-ink active:scale-95 transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+          <Link href="/" aria-label="NARAN" className="shrink-0 mr-auto"><Logo priority className="h-10"/></Link>
           <LangToggle/>
           {Wish}
           {Bag}
@@ -97,6 +128,59 @@ export function Nav() {
         {/* Search on its own full-width row, separate from the shop filters. */}
         <SearchBox className="mt-2.5" />
       </div>
+
+      {/* ---------- Mobile category drawer (slides from the left) ---------- */}
+      <AnimatePresence>
+        {menuOpen && (
+          <div className="lg:hidden">
+            <motion.div
+              className="fixed inset-0 z-[60] bg-ink/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMenuOpen(false)}
+            />
+            <motion.aside
+              className="fixed inset-y-0 left-0 z-[70] flex w-[84%] max-w-[330px] flex-col bg-white shadow-2xl"
+              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 380, damping: 38 }}
+              role="dialog" aria-modal="true" aria-label={t("nav.menu")}
+            >
+              <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-line">
+                <Link href="/" aria-label="NARAN" onClick={() => setMenuOpen(false)}><Logo className="h-9"/></Link>
+                <button type="button" onClick={() => setMenuOpen(false)} aria-label={t("common.close")}
+                  className="grid place-items-center w-9 h-9 rounded-full bg-surface-2 text-ink active:scale-95 transition">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="px-3 py-4 overflow-y-auto">
+                <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[.18em] text-subtle">{t("home.category")}</div>
+                <nav className="flex flex-col">
+                  {NAV_LINKS.map(([h, k]) => (
+                    <Link key={k} href={h} onClick={() => setMenuOpen(false)}
+                      className="flex items-center justify-between rounded-xl px-4 py-3.5 text-[15px] font-medium text-ink hover:bg-surface-2 transition-colors">
+                      {t(k)}
+                      <span className="text-subtle"><ArrowUpRight width={15} height={15}/></span>
+                    </Link>
+                  ))}
+                  <Link href="/shop" onClick={() => setMenuOpen(false)}
+                    className="flex items-center justify-between rounded-xl px-4 py-3.5 text-[15px] font-medium text-ink hover:bg-surface-2 transition-colors">
+                    {t("nav.shop")}
+                    <span className="text-subtle"><ArrowUpRight width={15} height={15}/></span>
+                  </Link>
+                </nav>
+              </div>
+
+              <div className="mt-auto border-t border-line px-5 py-4">
+                <Link href={mounted && user ? "/account" : "/auth"} onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-xl bg-accent-deep text-white px-4 py-3 text-[14px] font-semibold uppercase tracking-[.08em] active:scale-[.99] transition">
+                  <span className="w-8 h-8 rounded-full bg-white/15 grid place-items-center"><UserIcon width={15} height={15}/></span>
+                  {mounted && user ? user.firstName : t("nav.signin")}
+                </Link>
+              </div>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ---------- Desktop bar — floating glass pill ----------
           3-column grid (logo · links · controls). The logo never shrinks; links
@@ -110,11 +194,11 @@ export function Nav() {
 
         {/* Links wrap onto a clipped second line when space runs out, so a link
             either shows whole or not at all — never squeezes the logo. */}
-        <div className="flex flex-wrap items-start gap-x-5 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
-          {[["/shop?gender=men","nav.men",true],["/shop?gender=women","nav.women",true],["/shop?sort=new","nav.new",false],["/shop?gender=gift","gender.gift",false]].map(([h,k,pri]) => (
-            <Link key={k as string} href={h as string}
+        <div className="flex flex-wrap items-start gap-x-4 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
+          {NAV_LINKS.map(([h, k]) => (
+            <Link key={k} href={h}
               aria-current={localPath === h ? "page" : undefined}
-              className={`relative whitespace-nowrap text-[12px] uppercase tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${pri ? "inline-flex" : "hidden xl:inline-flex"} ${localPath===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k as string)}</Link>
+              className={`relative inline-flex whitespace-nowrap text-[12px] uppercase tracking-[.1em] xl:tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${localPath===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k)}</Link>
           ))}
         </div>
 

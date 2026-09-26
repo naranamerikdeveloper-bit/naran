@@ -12,7 +12,7 @@ const en: Dict = {
   "nav.seasonal": "Seasonal", "nav.accessories": "Accessories",
   "nav.search": "Search the collection…", "nav.searchShort": "Search…", "nav.signin": "Sign in",
   "search.none": "No products match", "search.all": "See all results", "common.clear": "Clear",
-  "nav.notifications": "Notifications", "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.account": "Account",
+  "nav.notifications": "Notifications", "nav.cart": "Cart", "nav.wishlist": "Wishlist", "nav.account": "Account", "nav.menu": "Menu",
   // common
   "common.seeAll": "See all", "common.shopAll": "Shop all", "common.viewAll": "View all",
   "common.soldOut": "Sold out", "common.from": "From", "common.reviews": "reviews",
@@ -216,7 +216,7 @@ const mn: Dict = {
   "nav.seasonal": "Улирлын", "nav.accessories": "Хэрэгсэл",
   "nav.search": "Бараа хайх…", "nav.searchShort": "Хайх…", "nav.signin": "Нэвтрэх",
   "search.none": "Тохирох бараа олдсонгүй:", "search.all": "Бүх үр дүнг харах", "common.clear": "Арилгах",
-  "nav.notifications": "Мэдэгдэл", "nav.cart": "Сагс", "nav.wishlist": "Хадгалсан", "nav.account": "Бүртгэл",
+  "nav.notifications": "Мэдэгдэл", "nav.cart": "Сагс", "nav.wishlist": "Хадгалсан", "nav.account": "Бүртгэл", "nav.menu": "Цэс",
   "common.seeAll": "Бүгдийг", "common.shopAll": "Бүгдийг үзэх", "common.viewAll": "Бүгдийг үзэх",
   "common.soldOut": "Дууссан", "common.from": "Эхлэх үнэ", "common.reviews": "сэтгэгдэл",
   "common.addToBag": "Сагсанд хийх", "common.buyNow": "Шууд авах", "common.free": "Үнэгүй",
