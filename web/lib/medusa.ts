@@ -237,17 +237,34 @@ async function fetchCatalog(categoryId?: string): Promise<Product[]> {
 }
 
 // Free-text search. Prefers MeiliSearch (typo-tolerant) via the plugin's store
+// Mongolian/Cyrillic → Latin transliteration. Brand names in the catalog are
+// Latin ("Chanel", "Dior"), but shoppers type them in Cyrillic ("чанел",
+// "диор") or approximate spelling ("шанел"). We transliterate a Cyrillic query
+// to Latin, then MeiliSearch's typo tolerance bridges the rest (shanel↔chanel).
+const CYR_MAP: Record<string, string> = {
+  щ: "sch", ш: "sh", ч: "ch", ц: "ts", ю: "yu", я: "ya", ё: "yo", ж: "j", х: "h",
+  э: "e", ы: "y", ө: "o", ү: "u", й: "i", ъ: "", ь: "",
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", з: "z", и: "i", к: "k", л: "l",
+  м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+};
+const HAS_CYRILLIC = /[Ѐ-ӿ]/;
+function translitQuery(q: string): string {
+  if (!HAS_CYRILLIC.test(q)) return q;
+  return q.toLowerCase().split("").map(ch => (ch in CYR_MAP ? CYR_MAP[ch] : ch)).join("");
+}
+
 // endpoint, which hydrates full products (with prices). Any failure — or Meili
 // disabled — falls back to Medusa's built-in `q` search so search never breaks.
 async function searchProducts(q: string, limit = 100, revalidate?: number): Promise<Product[]> {
+  const query = translitQuery(q);
   if (MEILI_ENABLED) {
     try {
-      const p = new URLSearchParams({ query: q, region_id: REGION, fields: FIELDS, limit: String(limit) });
+      const p = new URLSearchParams({ query, region_id: REGION, fields: FIELDS, limit: String(limit) });
       const res = await mfetch(`meilisearch/products?${p.toString()}`, 1, revalidate);
       return (res.products || []).map(map);
     } catch { /* fall through to built-in search */ }
   }
-  return (await fetchProducts({ q, limit, revalidate })).products;
+  return (await fetchProducts({ q: query, limit, revalidate })).products;
 }
 
 // Resolve storefront Category key → Medusa category id (cached for the session).
