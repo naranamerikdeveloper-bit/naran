@@ -11,6 +11,7 @@
 
 export type Role =
   | "super_admin"
+  | "cashier"
   | "order_processor"
   | "catalog_manager"
   | "marketer"
@@ -30,6 +31,9 @@ export type Permission =
 
 export const ROLES: { value: Role; label: string; permissions: Permission[] | ["*"] }[] = [
   { value: "super_admin", label: "Super Admin", permissions: ["*"] },
+  // Shop-floor cashier: the POS and nothing else — sell, take payment, check a
+  // discount code. No catalog, customers, reports or team access.
+  { value: "cashier", label: "Кассчин (POS)", permissions: ["orders.read", "orders.write"] },
   { value: "order_processor", label: "Захиалга боловсруулагч", permissions: ["orders.read", "orders.write", "returns.read", "returns.write", "catalog.read"] },
   { value: "catalog_manager", label: "Каталог менежер", permissions: ["catalog.read", "catalog.write", "inventory.write", "orders.read", "analytics.read"] },
   { value: "marketer", label: "Маркетер", permissions: ["promotions.write", "content.write", "analytics.read", "reports.read", "catalog.read"] },

@@ -149,6 +149,7 @@ export default defineMiddlewares({
     { matcher: "/admin/stores/:id", methods: ["POST"], middlewares: [guardStoreMetadata] },
     { matcher: "/admin/users/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/invites", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
+    { matcher: "/admin/team/invite-role", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
     // Not /admin/invites/accept — invited users (no role yet) call that to join.
     { matcher: "/admin/invites/:id/resend", methods: ["POST"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/invites/:id", methods: ["DELETE"], middlewares: [requirePermission("team.manage")] },

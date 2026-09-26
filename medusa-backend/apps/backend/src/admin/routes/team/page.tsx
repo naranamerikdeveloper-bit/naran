@@ -1,6 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk";
 import { UsersSolid } from "@medusajs/icons";
-import { Container, Heading, Text, Table, Badge, Select, toast } from "@medusajs/ui";
+import { Container, Heading, Text, Table, Badge, Select, Button, Input, Label, toast } from "@medusajs/ui";
 import { useEffect, useState } from "react";
 import { ROLES, Role } from "../../../lib/rbac";
 import { usePermissions } from "../../lib/perms";
@@ -13,6 +13,8 @@ type AdminUser = {
   last_name?: string | null;
   metadata?: { role?: Role } | null;
 };
+
+type Invite = { id: string; email: string; accepted?: boolean; expires_at?: string | null };
 
 const ROLE_LABEL = new Map(ROLES.map((r) => [r.value, r.label]));
 
@@ -35,6 +37,58 @@ const TeamPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // Invites
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("cashier");
+  const [inviting, setInviting] = useState(false);
+
+  const loadInvites = async () => {
+    try {
+      const res = await adminFetch("/invites?limit=100");
+      setInvites((await res.json()).invites || []);
+    } catch { /* invites are optional — never block the page */ }
+  };
+
+  const sendInvite = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Имэйл буруу байна"); return; }
+    setInviting(true);
+    try {
+      // Park the role first, so the invite email can name it and the new user
+      // gets it automatically the moment they accept.
+      await adminFetch("/team/invite-role", { method: "POST", body: JSON.stringify({ email, role: inviteRole }) });
+      await adminFetch("/invites", { method: "POST", body: JSON.stringify({ email }) });
+      toast.success(`${email} рүү урилга илгээлээ`);
+      setInviteEmail("");
+      await loadInvites();
+    } catch (e: any) {
+      toast.error(e.message || "Урилга илгээхэд алдаа гарлаа");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const resendInvite = async (inv: Invite) => {
+    try {
+      await adminFetch(`/invites/${inv.id}/resend`, { method: "POST" });
+      toast.success(`${inv.email} рүү дахин илгээлээ`);
+    } catch (e: any) {
+      toast.error(e.message || "Дахин илгээж чадсангүй");
+    }
+  };
+
+  const revokeInvite = async (inv: Invite) => {
+    if (!confirm(`${inv.email} рүү илгээсэн урилгыг цуцлах уу?`)) return;
+    try {
+      await adminFetch(`/invites/${inv.id}`, { method: "DELETE" });
+      toast.success("Урилга цуцлагдлаа");
+      await loadInvites();
+    } catch (e: any) {
+      toast.error(e.message || "Цуцалж чадсангүй");
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     try {
@@ -46,7 +100,7 @@ const TeamPage = () => {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadInvites(); }, []);
 
   const assign = async (id: string, role: Role) => {
     setSaving(id);
@@ -78,6 +132,62 @@ const TeamPage = () => {
         title="Баг ба эрх"
         description="Ажилтнуудад дүр (role) оноож, админ хэсгийн эрхийг хязгаарлана. Дүргүй хэрэглэгч түр зуур бүх эрхтэй (Super Admin) гэж тооцогдоно."
       />
+
+      {/* Invite a new member */}
+      <Panel title="Ажилтан урих" bodyClassName="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <Label size="small">Имэйл</Label>
+            <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="ajiltan@naranamerikbaraa.mn" className="w-[280px]"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendInvite(); } }} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label size="small">Эрх</Label>
+            <div className="w-[220px]">
+              <Select size="small" value={inviteRole} onValueChange={(v) => setInviteRole(v as Role)}>
+                <Select.Trigger><Select.Value /></Select.Trigger>
+                <Select.Content>
+                  {ROLES.map((r) => <Select.Item key={r.value} value={r.value}>{r.label}</Select.Item>)}
+                </Select.Content>
+              </Select>
+            </div>
+          </div>
+          <Button variant="primary" onClick={sendInvite} isLoading={inviting} disabled={!inviteEmail.trim()}>
+            Урилга илгээх
+          </Button>
+        </div>
+        <Text size="xsmall" className="mt-3 text-ui-fg-subtle">
+          Урилгын имэйл дээр холбоос болон код очно. Ажилтан түүгээр орж <b>өөрийн нууц үгээ</b> тохируулмагц
+          сонгосон эрх автоматаар онооно.
+        </Text>
+
+        {invites.filter(i => !i.accepted).length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-lg border border-ui-border-base">
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.HeaderCell>Хүлээгдэж буй урилга</Table.HeaderCell>
+                  <Table.HeaderCell />
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {invites.filter(i => !i.accepted).map((inv) => (
+                  <Table.Row key={inv.id}>
+                    <Table.Cell>{inv.email}</Table.Cell>
+                    <Table.Cell>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="secondary" size="small" onClick={() => resendInvite(inv)}>Дахин илгээх</Button>
+                        <Button variant="danger" size="small" onClick={() => revokeInvite(inv)}>Цуцлах</Button>
+                      </div>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
+          </div>
+        )}
+      </Panel>
 
       <Panel>
         <Table>

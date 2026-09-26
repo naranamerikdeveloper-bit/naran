@@ -82,6 +82,60 @@ export function renderPasswordResetEmail(o: PasswordResetEmail): string {
   </div>`;
 }
 
+// --- Staff invite -----------------------------------------------------------
+export type InviteEmail = { email: string; url: string; code: string; roleLabel?: string };
+
+export function renderInviteEmail(o: InviteEmail): string {
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;background:#FDF3EC;padding:32px">
+    <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;border:1px solid #F3E2D5">
+      <div style="background:linear-gradient(120deg,#FF7A2E,#E8550A);padding:26px 28px">
+        <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px">NARAN</span>
+      </div>
+      <div style="padding:28px">
+        <h1 style="margin:0 0 6px;font-size:22px;color:#0E0F10">Танд урилга ирлээ</h1>
+        <p style="margin:0 0 20px;color:#5C5F63;font-size:14px;line-height:1.7">
+          Та <b>NARAN</b>-ы удирдлагын системд${o.roleLabel ? ` <b>${o.roleLabel}</b> эрхээр` : ""}
+          нэмэгдлээ. Доорх товчийг дарж <b>өөрийн нууц үгээ</b> тохируулснаар бүртгэл идэвхжинэ.
+        </p>
+        <a href="${o.url}" style="display:inline-block;background:linear-gradient(95deg,#FF7A2E,#E8550A);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:999px">
+          Бүртгэлээ идэвхжүүлэх
+        </a>
+        <p style="margin:24px 0 6px;color:#5C5F63;font-size:13px">Товч ажиллахгүй бол урилгын кодыг ашиглана уу:</p>
+        <div style="background:#FDF3EC;border:1px dashed #E8550A;border-radius:10px;padding:12px 14px;font-family:monospace;font-size:12px;color:#0E0F10;word-break:break-all">${o.code}</div>
+        <p style="margin:18px 0 0;color:#8A8F93;font-size:12px;line-height:1.6">
+          Эсвэл энэ холбоосыг хөтөч рүүгээ хуулна уу:<br/>
+          <span style="color:#5C5F63;word-break:break-all">${o.url}</span>
+        </p>
+        <p style="margin:20px 0 0;color:#8A8F93;font-size:12px">
+          Хэрэв та энэ урилгыг хүлээгээгүй бол энэ имэйлийг үл тоомсорлоно уу.
+        </p>
+        <p style="margin:22px 0 0;color:#8A8F93;font-size:12px">NARAN · Гоо сайхан, нэг дороос · Улаанбаатар, Монгол</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+export async function sendInviteEmail(o: InviteEmail): Promise<void> {
+  const html = renderInviteEmail(o);
+  if (!KEY) {
+    console.log(`[email mock] staff invite → ${o.email}\n  invite link: ${o.url}`);
+    return;
+  }
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      signal: AbortSignal.timeout(10_000),
+      method: "POST",
+      headers: { authorization: `Bearer ${KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: FROM, to: o.email, subject: "NARAN — ажилтны урилга", html }),
+    });
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+    console.log(`[email] staff invite → ${o.email}`);
+  } catch (e: any) {
+    console.error("invite email failed:", e.message);
+  }
+}
+
 export async function sendPasswordResetEmail(o: PasswordResetEmail): Promise<void> {
   const html = renderPasswordResetEmail(o);
   if (!KEY) {
