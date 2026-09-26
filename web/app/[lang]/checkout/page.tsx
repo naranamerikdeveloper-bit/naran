@@ -75,7 +75,16 @@ export default function CheckoutPage() {
     if (!promoCode) return;
     let cancelled = false;
     medusa.previewPromo({ items: lineItemsFor(), shippingOptionId: shipOptionId || undefined, promoCode: promoCode })
-      .then(res => { if (!cancelled && res.valid) setPromo({ discountTotal: res.discountTotal, shippingTotal: res.shippingTotal, total: res.total }); })
+      .then(res => {
+        if (cancelled) return;
+        if (res.valid) { setPromo({ discountTotal: res.discountTotal, shippingTotal: res.shippingTotal, total: res.total }); return; }
+        // The code stopped applying (bag edited below a minimum, delivery
+        // changed…). Keeping the old figures showed a discount the shopper
+        // wouldn't get and then blocked Pay with a hard error — drop it and say so.
+        setPromo(null);
+        setPromoCode(null);
+        setPromoErr(t("co.promoInvalid"));
+      })
       .catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

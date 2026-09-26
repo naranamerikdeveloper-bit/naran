@@ -68,6 +68,29 @@ export async function getRecord<T>(id: string): Promise<T | null> {
   }
 }
 
+/**
+ * Atomically claim a one-shot key (Redis SET NX). Returns true only for the
+ * very first caller, false if someone already claimed it, and null when the
+ * store is unavailable — callers MUST treat null as "cannot guarantee" and fail
+ * closed for anything that books money.
+ */
+export async function claimOnce(id: string, ttlS = TTL_S): Promise<boolean | null> {
+  try {
+    const c = await conn();
+    if (!c) return null;
+    const ok = await withTimeout(c.set(`${PREFIX}claim:${id}`, "1", { NX: true, EX: ttlS }));
+    return ok === "OK";
+  } catch (e: any) {
+    console.error("[store] claim failed:", e.message);
+    return null;
+  }
+}
+
+/** Undo a claim, so a sale that failed to record can be retried. */
+export async function releaseClaim(id: string): Promise<void> {
+  try { const c = await conn(); if (c) await withTimeout(c.del(`${PREFIX}claim:${id}`)); } catch { /* ignore */ }
+}
+
 export async function pendingIds(): Promise<string[]> {
   try {
     const c = await conn();

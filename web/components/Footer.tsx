@@ -62,7 +62,8 @@ export function Footer() {
           <FootCol title={t("foot.links")} links={[["/", t("foot.home")], ["/shop", t("bc.shop")], ["/cart", t("foot.myCart")], ["/account", t("foot.account")]]}/>
 
           {/* 3. Categories — only ones the store actually carries */}
-          <FootCol title={t("foot.categories")} links={[["/shop?category=Fragrance", t("cat.Fragrance")], ["/shop?type=EDP", t("nav.edp")], ["/shop?type=EDT", t("nav.edt")], ["/shop?filter=new", t("home.newArrivals")]]}/>
+          {/* Same four categories as the header, so the whole site agrees. */}
+          <FootCol title={t("foot.categories")} links={[["/shop?gender=men", t("nav.men")], ["/shop?gender=women", t("nav.women")], ["/shop?sort=new", t("nav.new")], ["/shop?gender=gift", t("gender.gift")]]}/>
 
           {/* 4. Contact */}
           <div className="col-span-2 md:col-span-1">

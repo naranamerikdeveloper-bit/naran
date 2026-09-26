@@ -5,8 +5,8 @@ import {
   createOrderPaymentCollectionWorkflow,
   markPaymentCollectionAsPaid,
 } from "@medusajs/medusa/core-flows";
-import { decrementStockForVariants, stockForVariants } from "../../../lib/catalog";
-import { posInvoiceStatus } from "../../../lib/pos-payment";
+import { buildTicket, decrementStockForVariants, pricesForVariants, stockForVariants } from "../../../lib/catalog";
+import { posClaimInvoice, posReleaseInvoice } from "../../../lib/pos-payment";
 import { reserveOrderItems, fulfillOrder, shipOrder, deliverOrder } from "../../../lib/fulfillment";
 
 const CURRENCY = "mnt";
@@ -123,12 +123,12 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const body = req.body as any;
   const rawItems = Array.isArray(body?.items) ? body.items : [];
+  // `unit_price` from the body is deliberately ignored — see pricesForVariants.
   const items = rawItems
     .map((i: any) => ({
       variant_id: String(i.variant_id || ""),
       quantity: Math.max(1, Math.floor(Number(i.quantity) || 1)),
       title: String(i.title || "Бараа").slice(0, 200),
-      unit_price: Math.max(0, Math.round(Number(i.unit_price) || 0)),
     }))
     .filter((i: any) => i.variant_id);
 
@@ -148,37 +148,46 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return;
   }
 
-  // Optional order-level discount (MNT), computed on the client from % or amount.
-  const rawTotal = items.reduce((a: number, i: any) => a + i.unit_price * i.quantity, 0);
-  const discount = Math.min(rawTotal, Math.max(0, Math.round(Number(body?.discount) || 0)));
-  // Apply it by scaling line prices to hit (rawTotal − discount); the order
-  // total (Analytics/Reports) then equals what the customer actually paid.
-  const factor = discount > 0 && rawTotal > 0 ? (rawTotal - discount) / rawTotal : 1;
-  const orderItems = items.map((i: any) => ({ ...i, unit_price: Math.max(0, Math.round(i.unit_price * factor)) }));
-  const scaledTotal = orderItems.reduce((a: number, i: any) => a + i.unit_price * i.quantity, 0);
-  const effectiveDiscount = rawTotal - scaledTotal;
+  // Prices come from the catalogue, never the request body, and the discount is
+  // applied by scaling line prices so the order total equals what was paid.
+  const prices = await pricesForVariants(req.scope, items.map((i: any) => i.variant_id));
+  const unpriced = items.filter((i: any) => !prices.has(i.variant_id));
+  if (unpriced.length) {
+    res.status(409).json({ message: `Үнэгүй бараа байна: ${unpriced.map((m: any) => m.title).join(", ")}` });
+    return;
+  }
+  const { priced, rawTotal, orderItems, scaledTotal, effectiveDiscount } = buildTicket(items, prices, body?.discount);
 
   // QPay: the sale is only booked once the gateway confirms THIS invoice is paid
   // AND the paid amount matches the ticket — so a till can never record an order
   // against an unpaid, cancelled or cheaper invoice.
   const qpayInvoiceId = String(body?.qpayInvoiceId || "").trim();
+  // Set once the gateway hands us the one-shot claim, so a later failure can
+  // release it (see the outer catch).
+  let claimedInvoiceId: string | null = null;
   if (String(body?.paymentMethod || "") === "qpay") {
     if (!qpayInvoiceId) {
       res.status(400).json({ message: "QPay нэхэмжлэх олдсонгүй." });
       return;
     }
+    // Refuse a payment that already produced an order — belt and braces on top
+    // of the gateway's one-shot claim.
+    const { data: dupes } = await req.scope.resolve(ContainerRegistrationKeys.QUERY).graph({
+      entity: "order",
+      fields: ["id", "metadata"],
+      pagination: { take: 200, skip: 0, order: { created_at: "DESC" } },
+    });
+    if ((dupes || []).some((o: any) => o?.metadata?.qpay_invoice_id === qpayInvoiceId)) {
+      res.status(409).json({ message: "Энэ төлбөрөөр аль хэдийн борлуулалт бүртгэгдсэн байна." });
+      return;
+    }
     try {
-      const st = await posInvoiceStatus(qpayInvoiceId);
-      if (st.status !== "paid") {
-        res.status(402).json({ message: "Төлбөр хараахан баталгаажаагүй байна." });
-        return;
-      }
-      if (Math.round(Number(st.amount || 0)) !== scaledTotal) {
-        res.status(409).json({ message: "Төлсөн дүн тасалбарын дүнтэй таарахгүй байна." });
-        return;
-      }
+      // Atomic: only the first caller is allowed to book this payment.
+      await posClaimInvoice(qpayInvoiceId, scaledTotal);
+      claimedInvoiceId = qpayInvoiceId;
     } catch (e: any) {
-      res.status(502).json({ message: e?.message || "Төлбөр шалгаж чадсангүй" });
+      const status = Number(e?.status) || 502;
+      res.status(status === 404 ? 409 : status).json({ message: e?.message || "Төлбөр шалгаж чадсангүй" });
       return;
     }
   }
@@ -256,8 +265,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     let reserved = false;
     try {
       if (orderId) {
-        await reserveOrderItems(req.scope, orderId);
-        reserved = true;
+        // reserveOrderItems legitimately reserves NOTHING (no stock location, or
+        // a managed variant with no inventory link). Treating that as "reserved"
+        // skipped the manual decrement below, so stock was never reduced and the
+        // sale silently oversold. Only a real reservation counts.
+        const r = await reserveOrderItems(req.scope, orderId);
+        reserved = Number((r as any)?.reserved ?? 0) > 0;
         const f = await fulfillOrder(req.scope, orderId);
         if (f.fulfilled) {
           await shipOrder(req.scope, orderId);
@@ -287,7 +300,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       paid, fulfilled, stockAdjusted,
       // For the printable receipt (server is the source of truth on totals).
       receipt: {
-        items: items.map((i: any) => ({ title: i.title, quantity: i.quantity, unit_price: i.unit_price, amount: i.unit_price * i.quantity })),
+        items: priced.map((i: any) => ({ title: i.title, quantity: i.quantity, unit_price: i.unit_price, amount: i.unit_price * i.quantity })),
         subtotal: rawTotal,
         discount: effectiveDiscount || 0,
         total: orderTotal,
@@ -297,6 +310,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       },
     });
   } catch (e: any) {
+    // The payment was claimed but the sale didn't record — hand the claim back
+    // so the cashier can retry against the SAME invoice instead of charging the
+    // customer a second time.
+    if (claimedInvoiceId) await posReleaseInvoice(claimedInvoiceId);
     res.status(500).json({ message: e?.message || "Борлуулалт бүртгэхэд алдаа гарлаа" });
   }
 }

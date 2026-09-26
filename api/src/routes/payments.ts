@@ -8,7 +8,7 @@ import {
 } from "../lib/botxon.js";
 import { sendOrderConfirmation } from "../lib/email.js";
 import { rateLimit } from "../lib/rate-limit.js";
-import { putRecord, getRecord, pendingIds, dropPending } from "../lib/store.js";
+import { putRecord, getRecord, pendingIds, dropPending, claimOnce, releaseClaim } from "../lib/store.js";
 
 const MEDUSA_URL = process.env.MEDUSA_URL || "http://localhost:9000";
 // No baked-in fallback: a wrong/absent key must fail loudly, not silently use a
@@ -64,6 +64,9 @@ const transient = (e: any) => Object.assign(new Error(e?.message || "network err
 
 async function cartTotal(cartId: string): Promise<number> {
   const res = await fetch(`${MEDUSA_URL}/store/carts/${cartId}?fields=id,total,currency_code`, {
+    // Without a timeout a wedged Medusa holds this for minutes, and the
+    // reconciler is sequential — one stuck invoice blocks every other one.
+    signal: AbortSignal.timeout(8_000),
     headers: { "content-type": "application/json", "x-publishable-api-key": MEDUSA_PK },
   }).catch((e) => { throw transient(e); });
   if (res.status >= 500) throw transient(new Error(`Medusa ${res.status}`));
@@ -86,6 +89,7 @@ async function cartStockShortfall(cartId: string): Promise<string[]> {
     const fields =
       "items.quantity,items.title,items.product_title,items.variant.manage_inventory,items.variant.inventory_items.inventory.location_levels.available_quantity";
     const res = await fetch(`${MEDUSA_URL}/store/carts/${cartId}?fields=${encodeURIComponent(fields)}`, {
+      signal: AbortSignal.timeout(8_000),
       headers: { "content-type": "application/json", "x-publishable-api-key": MEDUSA_PK },
     });
     const data: any = await res.json().catch(() => ({}));
@@ -119,6 +123,8 @@ if (!INTERNAL_TOKEN && process.env.NODE_ENV === "production") {
 async function completeMedusaCart(cartId: string, shippingMethod: "standard" | "express") {
   const res = await fetch(`${MEDUSA_URL}/store/carts/${cartId}/complete`, {
     method: "POST",
+    // Completion can be slow, but not unbounded — see cartTotal.
+    signal: AbortSignal.timeout(20_000),
     headers: { "content-type": "application/json", "x-publishable-api-key": MEDUSA_PK, "x-naran-internal": INTERNAL_TOKEN },
     body: "{}",
   }).catch((e) => { throw transient(e); });
@@ -167,9 +173,12 @@ const isOpen = (r: Record) =>
 function saveInvoice(id: string, rec: Record) {
   invoices.set(id, rec);
   void putRecord(id, rec, isOpen(rec));
-  // Finished records live on in Redis; keep memory bounded (the status poll
-  // can still read them back via loadInvoice).
-  if (!isOpen(rec)) setTimeout(() => { if (invoices.get(id) === rec) invoices.delete(id); }, 15 * 60_000).unref();
+  // Every record is evicted from memory eventually — Redis remains the durable
+  // copy and loadInvoice re-hydrates on demand. Open records get a longer lease
+  // because they're actively polled; without this an abandoned checkout leaked
+  // a Map entry for the life of the process (OOM against the 256MB limit).
+  const ttl = isOpen(rec) ? 60 * 60_000 : 15 * 60_000;
+  setTimeout(() => { if (invoices.get(id) === rec) invoices.delete(id); }, ttl).unref();
 }
 
 async function loadInvoice(id: string): Promise<Record | undefined> {
@@ -192,12 +201,20 @@ function settleBotxon(invoiceId: string): Promise<Record | null> {
 
 async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
   const cached = await loadInvoice(invoiceId);
+  // An in-store invoice has no cart to complete — the till books the order
+  // itself once it claims the payment. Without this, every POS sale is dragged
+  // through cart settlement, fails "cart not found", and eventually raises a
+  // false "PAID BUT UNFULFILLED" alert.
+  if ((cached as any)?.kind === "pos") return null;
   if (cached?.status === "paid") return cached;
 
   // Botxon is the source of truth — re-check even when a webhook triggered us.
   const inv = await botxonGetInvoice(invoiceId);
   const cartId = cached?.cartId ?? inv.orderRef;
   if (!cartId) return null; // unknown invoice
+  // Belt and braces: an orderRef we've never recorded that isn't a Medusa cart
+  // id (POS refs, anything else on the shared gateway account) is not ours.
+  if (!cached && !cartId.startsWith("cart_")) return null;
 
   const rec: Record =
     cached ?? { cartId, amount: Math.round(inv.amount || 0), email: "", shippingMethod: "standard", status: "pending", attempts: 0, createdAt: Date.now() };
@@ -217,7 +234,15 @@ async function doSettleBotxon(invoiceId: string): Promise<Record | null> {
   };
   // What was collected: Botxon's reported amount, else what we invoiced. A
   // missing amount must not lock every payment into manual review.
-  const collected = Math.round(Number(inv.amount) > 0 ? Number(inv.amount) : rec.amount);
+  // Never fall back to our OWN invoiced figure here: comparing rec.amount to
+  // the cart total is self-referential and would wave a short payment through.
+  // A gateway that won't tell us what it collected is a case for a human.
+  const reported = Math.round(Number(inv.amount) || 0);
+  if (!(reported > 0)) {
+    mismatch(new Error(`gateway reported no amount for a paid invoice — manual check required`));
+    return rec;
+  }
+  const collected = reported;
   try {
     // Amount integrity: the cart stays editable after the invoice is issued, so
     // items could be added after paying a smaller invoice. Only complete when
@@ -343,6 +368,8 @@ if (BOTXON_LIVE) {
         const rec = await loadInvoice(id);
         if (!rec || !isOpen(rec) || Date.now() - (rec.createdAt ?? 0) > RECONCILE_MAX_AGE_MS) {
           await dropPending(id);
+          // loadInvoice just pulled it back into memory — don't leave it there.
+          invoices.delete(id);
           continue;
         }
         try { await settleBotxon(id); } catch (e: any) { console.error(`[reconcile] ${id}: ${e.message}`); }
@@ -373,13 +400,23 @@ function internalOnly(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// POS invoices are recorded so they can be recognised later: the status route
+// refuses ids we didn't mint, settlement skips them (there is no cart), and the
+// claim below can only succeed once. `kind` is what the cart pipeline checks.
+type PosRecord = { kind: "pos"; invoiceId: string; orderRef: string; amount: number; createdAt: number };
+
+// Generous cap: each open till polls every 2.5s, and they all arrive from the
+// single Medusa container, so the shared status limiter would throttle a
+// second/third till. These routes are already gated by the internal secret.
+const posLimit = rateLimit({ name: "pay-pos", windowMs: 60_000, max: 600 });
+
 const posInvoiceSchema = z.object({
   amount: z.number().int().positive().max(100_000_000),
   orderRef: z.string().min(1).max(64),
   description: z.string().max(200).optional(),
 });
 
-router.post("/pos/invoice", internalOnly, intentCreateLimit, async (req, res) => {
+router.post("/pos/invoice", internalOnly, posLimit, async (req, res) => {
   const parsed = posInvoiceSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid request" }); return; }
   const { amount, orderRef, description } = parsed.data;
@@ -389,6 +426,9 @@ router.post("/pos/invoice", internalOnly, intentCreateLimit, async (req, res) =>
       orderRef,
       description: description || `NARAN POS ${orderRef}`,
     });
+    const rec: PosRecord = { kind: "pos", invoiceId: inv.invoiceId, orderRef, amount, createdAt: Date.now() };
+    // Not pending: the reconciler settles carts, and a POS invoice has none.
+    await putRecord(inv.invoiceId, rec, false);
     res.json({
       invoiceId: inv.invoiceId, qrText: inv.qrText, qrImage: inv.qrImage,
       shortUrl: inv.shortUrl, urls: inv.urls, amount,
@@ -399,16 +439,80 @@ router.post("/pos/invoice", internalOnly, intentCreateLimit, async (req, res) =>
   }
 });
 
-router.get("/pos/invoice", internalOnly, statusLimit, async (req, res) => {
+async function posRecord(id: string): Promise<PosRecord | null> {
+  const rec = await getRecord<PosRecord>(id);
+  return rec && (rec as any).kind === "pos" ? rec : null;
+}
+
+router.get("/pos/invoice", internalOnly, posLimit, async (req, res) => {
   const id = String(req.query.id || "");
   if (!id) { res.status(400).json({ error: "id required" }); return; }
+  const rec = await posRecord(id);
+  // Never proxy an arbitrary invoice id from the merchant's gateway account.
+  if (!rec) { res.status(404).json({ error: "Нэхэмжлэх олдсонгүй" }); return; }
   try {
     const st = await botxonGetInvoice(id);
-    res.json({ status: st.status, amount: st.amount, orderRef: st.orderRef, paidAt: st.paidAt ?? null });
+    res.json({ status: st.status, amount: rec.amount, orderRef: rec.orderRef, paidAt: st.paidAt ?? null });
   } catch (e) {
     Sentry.captureException(e);
     res.status(502).json({ error: "Төлөв шалгаж чадсангүй" });
   }
+});
+
+/**
+ * Claim a paid POS invoice — exactly once.
+ *
+ * Booking the sale on "status == paid" alone let the same paid invoice be
+ * replayed into unlimited orders. The claim is an atomic Redis SET NX, so only
+ * the first caller is told to proceed; a sale that then fails to record calls
+ * /pos/invoice/release so the cashier can retry.
+ */
+router.post("/pos/invoice/claim", internalOnly, posLimit, async (req, res) => {
+  const id = String((req.body as any)?.invoiceId || "");
+  const amount = Math.round(Number((req.body as any)?.amount) || 0);
+  if (!id || amount <= 0) { res.status(400).json({ error: "Invalid request" }); return; }
+
+  const rec = await posRecord(id);
+  if (!rec) { res.status(404).json({ error: "Нэхэмжлэх олдсонгүй" }); return; }
+  if (rec.amount !== amount) {
+    res.status(409).json({ error: "Төлсөн дүн тасалбарын дүнтэй таарахгүй байна" });
+    return;
+  }
+
+  let st: Awaited<ReturnType<typeof botxonGetInvoice>>;
+  try {
+    st = await botxonGetInvoice(id);
+  } catch (e) {
+    Sentry.captureException(e);
+    res.status(502).json({ error: "Төлбөр шалгаж чадсангүй" });
+    return;
+  }
+  if (st.status !== "paid") { res.status(402).json({ error: "Төлбөр хараахан баталгаажаагүй байна" }); return; }
+  // Trust our own minted amount, but refuse if the gateway reports a different
+  // (non-zero) figure — a short payment must never book a sale.
+  const paid = Math.round(Number(st.amount) || 0);
+  if (paid > 0 && paid !== rec.amount) {
+    res.status(409).json({ error: "Төлсөн дүн тасалбарын дүнтэй таарахгүй байна" });
+    return;
+  }
+
+  const claimed = await claimOnce(id);
+  if (claimed === null) {
+    // No durable store → we cannot promise single use. Fail closed: cash and
+    // card still work, and a duplicate free order is worse than a retry.
+    res.status(503).json({ error: "Төлбөрийн бүртгэл түр боломжгүй байна" });
+    return;
+  }
+  if (!claimed) { res.status(409).json({ error: "Энэ төлбөрөөр аль хэдийн борлуулалт бүртгэгдсэн байна" }); return; }
+
+  res.json({ ok: true, orderRef: rec.orderRef, amount: rec.amount });
+});
+
+router.post("/pos/invoice/release", internalOnly, posLimit, async (req, res) => {
+  const id = String((req.body as any)?.invoiceId || "");
+  if (!id) { res.status(400).json({ error: "Invalid request" }); return; }
+  await releaseClaim(id);
+  res.json({ ok: true });
 });
 
 export default router;
@@ -436,7 +540,10 @@ export async function botxonWebhook(req: Request, res: Response) {
     // settle a mismatched amount — leave it to the status poll / manual review.
     // (settleBotxon re-verifies against the completed order total regardless.)
     const rec = await loadInvoice(eventInvoiceId);
-    if (rec && typeof event.amount === "number" && Math.round(event.amount) !== rec.amount) {
+    // Coerce: gateways commonly send the amount as a string ("200000"), and a
+    // `typeof === "number"` guard would skip the check entirely for those.
+    const eventAmount = Number(event.amount);
+    if (rec && Number.isFinite(eventAmount) && Math.round(eventAmount) !== rec.amount) {
       console.error(`[botxon] webhook amount mismatch invoice=${eventInvoiceId} webhook=${event.amount} expected=${rec.amount}`);
       try { Sentry.captureMessage(`Botxon webhook amount mismatch invoice ${eventInvoiceId}`, "warning"); } catch { /* no DSN */ }
       return res.json({ received: true });

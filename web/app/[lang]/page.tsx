@@ -197,7 +197,9 @@ export default async function HomePage({ params }: { params: { lang: Lang } }) {
                 <span className="eyebrow">{t("home.justDropped")}</span>
                 <h2 className="font-display text-[28px] sm:text-[36px] tracking-tight mt-2">{t("home.newArrivals")}</h2>
               </div>
-              <Link href="/shop?filter=new" className="btn btn-outline btn-sm hidden sm:inline-flex">{t("common.viewAll")} <ArrowRight width={14} height={14}/></Link>
+              {/* sort=new, not filter=new: this section is "newest first", and
+                  filtering to the New badge could land on an empty page. */}
+              <Link href="/shop?sort=new" className="btn btn-outline btn-sm hidden sm:inline-flex">{t("common.viewAll")} <ArrowRight width={14} height={14}/></Link>
             </div>
           </Reveal>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

@@ -155,9 +155,18 @@ function map(m: any): Product {
   const sizes = sizeOpt?.values?.map((v: any) => v.value) ?? ["One size"];
   const description = m.description || "";
 
+  // Untracked, or no inventory data at all → treat as available. Missing data
+  // must NOT read as zero: a partial response (field expansion dropped, a
+  // variant not yet linked to an inventory item) would otherwise mark the whole
+  // catalogue "sold out" and stop every sale. Real zeros still come through —
+  // once levels exist, their sum is respected.
+  const UNTRACKED = 9999;
   const variantStock = (v: any): number => {
-    if (v?.manage_inventory === false) return 9999;
-    const levels = (v?.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
+    if (v?.manage_inventory === false) return UNTRACKED;
+    const items = v?.inventory_items;
+    if (!Array.isArray(items) || items.length === 0) return UNTRACKED;
+    const levels = items.flatMap((ii: any) => ii?.inventory?.location_levels || []);
+    if (levels.length === 0) return UNTRACKED;
     return levels.reduce((a: number, l: any) => a + (l?.available_quantity ?? 0), 0);
   };
   const variants = (m.variants || []).map((v: any) => {
@@ -334,7 +343,12 @@ function categoryIds(): Promise<Record<string, string>> {
         if (key) out[key] = c.id;
       }
       return out;
-    } catch { return {}; }
+    } catch {
+      // Don't cache a failure: the resolved promise would stick for the life of
+      // the process, permanently degrading related products after one hiccup.
+      _catIds = null;
+      return {};
+    }
   })();
   return _catIds;
 }

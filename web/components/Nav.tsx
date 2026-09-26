@@ -2,13 +2,14 @@
 import { Logo } from "./Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SearchIcon, BagIcon, UserIcon, HeartIcon, ArrowUpRight } from "./Icons";
 import { useAuth, useCart, useWish, useUI } from "@/lib/store";
 import { useT, useLang } from "./LangProvider";
 import { LangToggle } from "./LangToggle";
 import { SearchBox } from "./SearchBox";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 // Small circular icon button that carries an animated count badge (shared by the
 // wishlist + cart controls).
@@ -61,7 +62,25 @@ export function Nav() {
 
   // Mobile category drawer (slides in from the left). Closes on navigation and
   // locks background scroll while open.
+  // Nav hrefs carry a query (/shop?gender=men), so comparing them to the bare
+  // pathname never matched and nothing was ever highlighted. Read the query on
+  // the client instead of useSearchParams, which would opt these pages out of
+  // static rendering.
+  const [search, setSearch] = useState("");
+  useEffect(() => { setSearch(window.location.search); }, [pathname]);
+  const isActive = (href: string) => {
+    const [path, qs] = href.split("?");
+    if (localPath !== path) return false;
+    if (!qs) return !search || search === "?";
+    const [k, v] = qs.split("=");
+    return new URLSearchParams(search).get(k) === v;
+  };
+
   const [menuOpen, setMenuOpen] = useState(false);
+  // Keyboard/screen-reader users must not tab out of the open drawer into the
+  // page behind it (the cart drawer already does this).
+  const menuPanelRef = useRef<HTMLElement>(null);
+  useFocusTrap(menuPanelRef, menuOpen);
   useEffect(() => { setMenuOpen(false); }, [pathname]);
   useEffect(() => {
     if (!menuOpen) return;
@@ -139,6 +158,7 @@ export function Nav() {
               onClick={() => setMenuOpen(false)}
             />
             <motion.aside
+              ref={menuPanelRef}
               className="fixed inset-y-0 left-0 z-[70] flex w-[84%] max-w-[330px] flex-col bg-white shadow-2xl"
               initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 380, damping: 38 }}
@@ -197,8 +217,8 @@ export function Nav() {
         <div className="flex flex-wrap items-start gap-x-4 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
           {NAV_LINKS.map(([h, k]) => (
             <Link key={k} href={h}
-              aria-current={localPath === h ? "page" : undefined}
-              className={`relative inline-flex whitespace-nowrap text-[12px] uppercase tracking-[.1em] xl:tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${localPath===h?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k)}</Link>
+              aria-current={isActive(h) ? "page" : undefined}
+              className={`relative inline-flex whitespace-nowrap text-[12px] uppercase tracking-[.1em] xl:tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${isActive(h)?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k)}</Link>
           ))}
         </div>
 

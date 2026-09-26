@@ -280,40 +280,155 @@ export type StockMove = { sku: string; product: string; from: number; to: number
 // inventory item). Creates one inventory item per variant, links it to the
 // variant, and sets an initial level at the given location. Callers pass only
 // variants that currently lack a managed inventory item, so this is idempotent.
+/**
+ * Authoritative MNT price per variant, straight from the catalogue.
+ *
+ * The POS must never price a sale from the request body: anyone holding a
+ * cashier session could post `unit_price: 1000` for a ₮900,000 bottle, and
+ * because the QPay invoice was minted from the same client figure the
+ * paid-amount check would happily agree with itself.
+ */
+export async function pricesForVariants(container: any, variantIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const want = new Set(variantIds.filter(Boolean));
+  if (!want.size) return out;
+  const query = container.resolve(ContainerRegistrationKeys.QUERY);
+  for (let skip = 0; ; skip += 500) {
+    const { data } = await query.graph({
+      entity: "variant",
+      fields: ["id", "prices.amount", "prices.currency_code"],
+      pagination: { skip, take: 500 },
+    });
+    for (const v of data as any[]) {
+      if (!want.has(v.id)) continue;
+      const mnt = (v.prices || []).find((p: any) => p.currency_code === "mnt");
+      if (mnt && Number.isFinite(Number(mnt.amount))) out.set(v.id, Math.max(0, Math.round(Number(mnt.amount))));
+      if (out.size === want.size) return out;
+    }
+    if (data.length < 500) break;
+  }
+  return out;
+}
+
+/**
+ * Shared POS ticket arithmetic — used both to mint the QPay invoice and to
+ * record the sale, so the invoiced amount and the booked order can never drift.
+ * Prices come from `pricesForVariants`; the discount is applied by scaling line
+ * prices so the order total equals what the customer actually paid.
+ */
+export function buildTicket(
+  items: { variant_id: string; quantity: number; title: string }[],
+  prices: Map<string, number>,
+  rawDiscount: number,
+) {
+  const priced = items.map(i => ({ ...i, unit_price: prices.get(i.variant_id) ?? 0 }));
+  const rawTotal = priced.reduce((a, i) => a + i.unit_price * i.quantity, 0);
+  const discount = Math.min(rawTotal, Math.max(0, Math.round(Number(rawDiscount) || 0)));
+  const factor = discount > 0 && rawTotal > 0 ? (rawTotal - discount) / rawTotal : 1;
+  const orderItems = priced.map(i => ({ ...i, unit_price: Math.max(0, Math.round(i.unit_price * factor)) }));
+  const scaledTotal = orderItems.reduce((a, i) => a + i.unit_price * i.quantity, 0);
+  return { priced, rawTotal, discount, orderItems, scaledTotal, effectiveDiscount: rawTotal - scaledTotal };
+}
+
+export type StockFailure = { sku: string; reason: string };
+
+/** Set the quantity at a location, creating the level when it doesn't exist yet. */
+async function setLevel(container: any, inventoryItemId: string, locationId: string, qty: number) {
+  const inventoryModule = container.resolve(Modules.INVENTORY);
+  const levels: any[] = await inventoryModule.listInventoryLevels(
+    { inventory_item_id: inventoryItemId, location_id: locationId },
+    { take: 1 },
+  );
+  if (levels.length) {
+    await updateInventoryLevelsWorkflow(container).run({
+      input: { updates: [{ inventory_item_id: inventoryItemId, location_id: locationId, stocked_quantity: qty }] },
+    });
+  } else {
+    // updateInventoryLevels THROWS on a missing level, which would abort the
+    // whole batch — create it instead.
+    await createInventoryLevelsWorkflow(container).run({
+      input: { inventory_levels: [{ inventory_item_id: inventoryItemId, location_id: locationId, stocked_quantity: qty }] } as any,
+    });
+  }
+}
+
+/**
+ * Turn on inventory tracking for variants that were imported untracked.
+ *
+ * Done one variant at a time, deliberately. `inventory_item.sku` is UNIQUE and
+ * Medusa keeps the item when a variant is un-tracked (it only drops the link),
+ * so blindly creating items collides — and because the `manage_inventory` flip
+ * is a separate workflow with no compensation, a mid-batch throw used to leave
+ * products managed with NO level, i.e. permanently "sold out" and unsellable.
+ *
+ * So: reuse an existing item when the SKU already has one, create item + level
+ * together, link, and only then flip the variants that actually succeeded. A
+ * failure is reported per SKU instead of poisoning the batch.
+ */
 async function enableInventoryForVariants(
   container: any,
   locationId: string,
   items: { variant_id: string; sku: string; quantity: number }[],
-): Promise<number> {
-  if (!items.length) return 0;
+): Promise<{ enabled: number; failures: StockFailure[] }> {
+  if (!items.length) return { enabled: 0, failures: [] };
   const link = container.resolve(ContainerRegistrationKeys.LINK);
-  // 1) Mark the variants inventory-managed.
-  await updateProductVariantsWorkflow(container).run({
-    input: { selector: { id: items.map(i => i.variant_id) }, update: { manage_inventory: true } as any },
-  });
-  // 2) Create one inventory item per variant (order preserved).
-  const { result: created } = await createInventoryItemsWorkflow(container).run({
-    input: { items: items.map(i => ({ sku: i.sku })) } as any,
-  });
-  const invItems = (created as any[]) || [];
-  // 3) Link each variant to its inventory item + queue an initial level.
-  const levels: { inventory_item_id: string; location_id: string; stocked_quantity: number }[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const iid = invItems[i]?.id;
-    if (!iid) continue;
-    await link.create({
-      [Modules.PRODUCT]: { variant_id: items[i].variant_id },
-      [Modules.INVENTORY]: { inventory_item_id: iid },
+  const inventoryModule = container.resolve(Modules.INVENTORY);
+  const failures: StockFailure[] = [];
+
+  const skus = Array.from(new Set(items.map(i => i.sku).filter(Boolean)));
+  let bySku = new Map<string, string>();
+  try {
+    const existing: any[] = skus.length
+      ? await inventoryModule.listInventoryItems({ sku: skus }, { select: ["id", "sku"] as any, take: skus.length })
+      : [];
+    bySku = new Map(existing.map((it: any) => [it.sku, it.id]));
+  } catch { /* fall through: we'll just try to create */ }
+
+  const ok: string[] = [];
+  for (const it of items) {
+    try {
+      let iid = bySku.get(it.sku);
+      if (iid) {
+        await setLevel(container, iid, locationId, it.quantity);
+      } else {
+        const { result } = await createInventoryItemsWorkflow(container).run({
+          input: {
+            items: [{
+              sku: it.sku,
+              location_levels: [{ location_id: locationId, stocked_quantity: it.quantity }],
+            }],
+          } as any,
+        });
+        iid = ((result as any[]) || [])[0]?.id;
+        if (!iid) throw new Error("inventory item was not created");
+      }
+      // Already-linked throws; that's fine, the link is what we wanted.
+      await link.create({
+        [Modules.PRODUCT]: { variant_id: it.variant_id },
+        [Modules.INVENTORY]: { inventory_item_id: iid },
+      }).catch(() => {});
+      ok.push(it.variant_id);
+    } catch (e: any) {
+      failures.push({ sku: it.sku, reason: e?.message || "тохируулж чадсангүй" });
+    }
+  }
+
+  if (ok.length) {
+    await updateProductVariantsWorkflow(container).run({
+      input: { selector: { id: ok }, update: { manage_inventory: true } as any },
     });
-    levels.push({ inventory_item_id: iid, location_id: locationId, stocked_quantity: items[i].quantity });
   }
-  if (levels.length) {
-    await createInventoryLevelsWorkflow(container).run({ input: { inventory_levels: levels } as any });
-  }
-  return levels.length;
+  return { enabled: ok.length, failures };
 }
 
-export type StockResult = { updated: number; notManaged: number; notFound: number; moves: StockMove[] };
+export type StockResult = {
+  updated: number; notManaged: number; notFound: number;
+  moves: StockMove[];
+  /** Rows whose handle/SKU matched nothing — previously reported as 0. */
+  unmatched: string[];
+  /** Variants that could not be switched to tracked inventory, with the reason. */
+  failures: StockFailure[];
+};
 
 // Bulk-set stock from rows of { handle|sku, stock }. `sku` targets one variant;
 // `handle` sets every variant of that product. Only inventory-managed variants.
@@ -332,9 +447,13 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
   }
 
   const updates: { inventory_item_id: string; location_id: string; stocked_quantity: number }[] = [];
+  const creates: { inventory_item_id: string; location_id: string; stocked_quantity: number }[] = [];
   const toEnable: { variant_id: string; sku: string; quantity: number }[] = [];
   const moves: StockMove[] = [];
-  let notFound = 0;
+  // Track what actually matched, so a typo'd handle is reported instead of
+  // silently succeeding with 0 changes.
+  const matchedHandles = new Set<string>();
+  const matchedSkus = new Set<string>();
   for (let skip = 0; ; skip += 500) {
     const { data } = await query.graph({
       entity: "variant",
@@ -348,16 +467,19 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
     });
     for (const v of data as any[]) {
       let stock: number | undefined;
-      if (v.sku && bySku.has(v.sku)) stock = bySku.get(v.sku);
-      else if (v.product?.handle && byHandle.has(v.product.handle)) stock = byHandle.get(v.product.handle);
+      if (v.sku && bySku.has(v.sku)) { stock = bySku.get(v.sku); matchedSkus.add(v.sku); }
+      else if (v.product?.handle && byHandle.has(v.product.handle)) { stock = byHandle.get(v.product.handle); matchedHandles.add(v.product.handle); }
       if (stock === undefined) continue;
       const item = (v.inventory_items || [])[0];
       const iid = item?.inventory_item_id;
       if (v.manage_inventory && iid) {
-        // Already tracked — just set the absolute quantity at this location.
+        // Already tracked — set the absolute quantity at this location. A level
+        // may not exist here yet (item created against another location), and
+        // updateInventoryLevels THROWS on a missing one, taking the whole batch
+        // with it — so route those to a create instead.
         const level = (item?.inventory?.location_levels || []).find((l: any) => l.location_id === location.id);
         const from = Number(level?.stocked_quantity ?? 0);
-        updates.push({ inventory_item_id: iid, location_id: location.id, stocked_quantity: stock });
+        (level ? updates : creates).push({ inventory_item_id: iid, location_id: location.id, stocked_quantity: stock });
         if (from !== stock) moves.push({ sku: v.sku || iid, product: v.product?.title || "—", from, to: stock });
       } else {
         // Imported unmanaged (or no inventory item yet) — turn tracking on and
@@ -369,9 +491,22 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
     if (data.length < 500) break;
   }
 
+  if (creates.length) {
+    await createInventoryLevelsWorkflow(container).run({ input: { inventory_levels: creates } as any });
+  }
   if (updates.length) {
     await updateInventoryLevelsWorkflow(container).run({ input: { updates } });
   }
-  const enabled = await enableInventoryForVariants(container, location.id, toEnable);
-  return { updated: updates.length + enabled, notManaged: 0, notFound, moves };
+  const { enabled, failures } = await enableInventoryForVariants(container, location.id, toEnable);
+
+  const unmatched = [
+    ...[...byHandle.keys()].filter(h => !matchedHandles.has(h)),
+    ...[...bySku.keys()].filter(s => !matchedSkus.has(s)),
+  ];
+  return {
+    updated: updates.length + creates.length + enabled,
+    notManaged: 0,
+    notFound: unmatched.length,
+    moves, unmatched, failures,
+  };
 }
