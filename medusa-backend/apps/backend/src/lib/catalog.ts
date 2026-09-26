@@ -1,5 +1,11 @@
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils";
-import { createProductsWorkflow, updateInventoryLevelsWorkflow } from "@medusajs/medusa/core-flows";
+import {
+  createProductsWorkflow,
+  updateInventoryLevelsWorkflow,
+  createInventoryItemsWorkflow,
+  createInventoryLevelsWorkflow,
+  updateProductVariantsWorkflow,
+} from "@medusajs/medusa/core-flows";
 import { MN_TO_HANDLE } from "../scripts/seed-categories";
 
 // Shared catalog logic used by both the CLI importer and the admin UI, so bulk
@@ -270,6 +276,43 @@ export async function decrementStockForVariants(
 }
 
 export type StockMove = { sku: string; product: string; from: number; to: number };
+// Turn on inventory tracking for variants that were imported unmanaged (no
+// inventory item). Creates one inventory item per variant, links it to the
+// variant, and sets an initial level at the given location. Callers pass only
+// variants that currently lack a managed inventory item, so this is idempotent.
+async function enableInventoryForVariants(
+  container: any,
+  locationId: string,
+  items: { variant_id: string; sku: string; quantity: number }[],
+): Promise<number> {
+  if (!items.length) return 0;
+  const link = container.resolve(ContainerRegistrationKeys.LINK);
+  // 1) Mark the variants inventory-managed.
+  await updateProductVariantsWorkflow(container).run({
+    input: { selector: { id: items.map(i => i.variant_id) }, update: { manage_inventory: true } as any },
+  });
+  // 2) Create one inventory item per variant (order preserved).
+  const { result: created } = await createInventoryItemsWorkflow(container).run({
+    input: { items: items.map(i => ({ sku: i.sku })) } as any,
+  });
+  const invItems = (created as any[]) || [];
+  // 3) Link each variant to its inventory item + queue an initial level.
+  const levels: { inventory_item_id: string; location_id: string; stocked_quantity: number }[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const iid = invItems[i]?.id;
+    if (!iid) continue;
+    await link.create({
+      [Modules.PRODUCT]: { variant_id: items[i].variant_id },
+      [Modules.INVENTORY]: { inventory_item_id: iid },
+    });
+    levels.push({ inventory_item_id: iid, location_id: locationId, stocked_quantity: items[i].quantity });
+  }
+  if (levels.length) {
+    await createInventoryLevelsWorkflow(container).run({ input: { inventory_levels: levels } as any });
+  }
+  return levels.length;
+}
+
 export type StockResult = { updated: number; notManaged: number; notFound: number; moves: StockMove[] };
 
 // Bulk-set stock from rows of { handle|sku, stock }. `sku` targets one variant;
@@ -289,8 +332,9 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
   }
 
   const updates: { inventory_item_id: string; location_id: string; stocked_quantity: number }[] = [];
+  const toEnable: { variant_id: string; sku: string; quantity: number }[] = [];
   const moves: StockMove[] = [];
-  let notManaged = 0, notFound = 0;
+  let notFound = 0;
   for (let skip = 0; ; skip += 500) {
     const { data } = await query.graph({
       entity: "variant",
@@ -307,15 +351,20 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
       if (v.sku && bySku.has(v.sku)) stock = bySku.get(v.sku);
       else if (v.product?.handle && byHandle.has(v.product.handle)) stock = byHandle.get(v.product.handle);
       if (stock === undefined) continue;
-      if (!v.manage_inventory) { notManaged++; continue; }
       const item = (v.inventory_items || [])[0];
       const iid = item?.inventory_item_id;
-      if (!iid) { notFound++; continue; }
-      // Current quantity at this location (for the movement's "from").
-      const level = (item?.inventory?.location_levels || []).find((l: any) => l.location_id === location.id);
-      const from = Number(level?.stocked_quantity ?? 0);
-      updates.push({ inventory_item_id: iid, location_id: location.id, stocked_quantity: stock });
-      if (from !== stock) moves.push({ sku: v.sku || iid, product: v.product?.title || "—", from, to: stock });
+      if (v.manage_inventory && iid) {
+        // Already tracked — just set the absolute quantity at this location.
+        const level = (item?.inventory?.location_levels || []).find((l: any) => l.location_id === location.id);
+        const from = Number(level?.stocked_quantity ?? 0);
+        updates.push({ inventory_item_id: iid, location_id: location.id, stocked_quantity: stock });
+        if (from !== stock) moves.push({ sku: v.sku || iid, product: v.product?.title || "—", from, to: stock });
+      } else {
+        // Imported unmanaged (or no inventory item yet) — turn tracking on and
+        // seed the level, so entering a stock number "just works" for any product.
+        toEnable.push({ variant_id: v.id, sku: v.sku || v.id, quantity: stock });
+        moves.push({ sku: v.sku || v.id, product: v.product?.title || "—", from: 0, to: stock });
+      }
     }
     if (data.length < 500) break;
   }
@@ -323,5 +372,6 @@ export async function setStockFromRows(container: any, rows: Record<string, stri
   if (updates.length) {
     await updateInventoryLevelsWorkflow(container).run({ input: { updates } });
   }
-  return { updated: updates.length, notManaged, notFound, moves };
+  const enabled = await enableInventoryForVariants(container, location.id, toEnable);
+  return { updated: updates.length + enabled, notManaged: 0, notFound, moves };
 }

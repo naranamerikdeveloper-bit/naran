@@ -47,6 +47,7 @@ const BulkEditPage = () => {
   const [catAdd, setCatAdd] = useState("");
   const [catRemove, setCatRemove] = useState("");
   const [setGender, setSetGender] = useState("");
+  const [setStockVal, setSetStockVal] = useState("");
 
   useEffect(() => {
     adminFetch("/product-categories?limit=100&fields=id,name")
@@ -81,8 +82,8 @@ const BulkEditPage = () => {
   });
 
   const hasChange = useMemo(
-    () => setStatus || setPrice.trim() || catAdd || catRemove || setGender,
-    [setStatus, setPrice, catAdd, catRemove, setGender],
+    () => setStatus || setPrice.trim() || catAdd || catRemove || setGender || setStockVal.trim(),
+    [setStatus, setPrice, catAdd, catRemove, setGender, setStockVal],
   );
 
   const apply = async () => {
@@ -93,6 +94,7 @@ const BulkEditPage = () => {
     if (catAdd) set.category_add = catAdd;
     if (catRemove) set.category_remove = catRemove;
     if (setGender) set.gender = setGender;
+    if (setStockVal.trim() !== "") set.stock = Number(setStockVal);
     setBusy(true);
     try {
       const r = await adminFetch("/catalog/bulk-edit", {
@@ -102,7 +104,7 @@ const BulkEditPage = () => {
       const parts = Object.keys(r.applied || {});
       toast.success(`${nf(r.count)} бараанд хэрэгжлээ: ${parts.join(", ") || "—"}`);
       if (r.errors) toast.warning(`Алдаа: ${Object.keys(r.errors).join(", ")}`);
-      setSetStatus(""); setSetPrice(""); setCatAdd(""); setCatRemove(""); setSetGender("");
+      setSetStatus(""); setSetPrice(""); setCatAdd(""); setCatRemove(""); setSetGender(""); setSetStockVal("");
       setSelected(new Set());
       await load(offset);
     } catch (e: any) {
@@ -198,6 +200,10 @@ const BulkEditPage = () => {
                 </Select.Content>
               </Select>
             </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label size="small">Нөөц (үлдэгдэл)</Label>
+            <Input value={setStockVal} onChange={(e) => setSetStockVal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Өөрчлөхгүй" className="w-[110px]" inputMode="numeric" />
           </div>
           <div className="flex flex-col gap-1">
             <Label size="small">Хүйс (Эр/Эм)</Label>
