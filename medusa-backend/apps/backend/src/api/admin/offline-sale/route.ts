@@ -78,26 +78,35 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const { data } = await query.graph({
     entity: "product",
     fields: [
-      "id", "title", "thumbnail",
+      "id", "title", "subtitle", "thumbnail", "metadata",
+      "categories.id", "categories.name", "categories.handle",
       "variants.id", "variants.title", "variants.sku", "variants.manage_inventory",
       "variants.prices.amount", "variants.prices.currency_code",
       "variants.inventory_items.inventory.location_levels.available_quantity",
     ],
     filters,
-    pagination: { take: 50, skip: 0, order: { title: "ASC" } },
+    // The POS grid loads the catalog once and filters client-side (instant for a
+    // cashier), so take the whole published catalog rather than a search page.
+    pagination: { take: 300, skip: 0, order: { title: "ASC" } },
   });
 
-  const products = (data || []).map((p: any) => ({
-    id: p.id,
-    title: p.title,
-    thumbnail: p.thumbnail || "",
-    variants: (p.variants || []).map((v: any) => {
-      const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);
-      const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
-      const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
-      return { id: v.id, title: v.title || p.title, sku: v.sku || "", price: mnt ? Number(mnt.amount) : 0, manage: v.manage_inventory !== false, stock: v.manage_inventory === false ? null : available };
-    }),
-  }));
+  const products = (data || []).map((p: any) => {
+    const meta = (p.metadata || {}) as Record<string, any>;
+    return {
+      id: p.id,
+      title: p.title,
+      thumbnail: p.thumbnail || "",
+      brand: meta.brand || p.subtitle || "",
+      gender: typeof meta.gender === "string" ? meta.gender : "",
+      categories: (p.categories || []).map((c: any) => ({ id: c.id, name: c.name, handle: c.handle })),
+      variants: (p.variants || []).map((v: any) => {
+        const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);
+        const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
+        const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
+        return { id: v.id, title: v.title || p.title, sku: v.sku || "", price: mnt ? Number(mnt.amount) : 0, manage: v.manage_inventory !== false, stock: v.manage_inventory === false ? null : available };
+      }),
+    };
+  });
 
   res.json({ products });
 }
