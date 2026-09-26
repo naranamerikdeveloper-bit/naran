@@ -1,7 +1,7 @@
-import { Router, raw, type Request, type Response } from "express";
+import { Router, raw, type Request, type Response, type NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { z } from "zod";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   createInvoice as botxonCreateInvoice, getInvoice as botxonGetInvoice,
   verifyBotxonSignature, BOTXON_LIVE, type BotxonInvoice,
@@ -350,6 +350,66 @@ if (BOTXON_LIVE) {
     } finally { running = false; }
   }, RECONCILE_MS).unref();
 }
+
+// ---------------------------------------------------------------------------
+// POS (in-store) invoices — internal only.
+//
+// The till asks Medusa for a QPay invoice; Medusa authenticates the cashier and
+// computes the authoritative amount, then calls us with the shared internal
+// token. These invoices are deliberately NOT part of the cart reconciliation
+// pipeline — there is no cart to complete. Medusa polls the status and records
+// the in-store order itself once we report the invoice paid.
+function internalOnly(req: Request, res: Response, next: NextFunction) {
+  if (!INTERNAL_TOKEN) {
+    if (process.env.NODE_ENV === "production") { res.status(403).json({ error: "Not allowed" }); return; }
+    return next(); // local dev without the secret
+  }
+  const got = Buffer.from(String(req.headers["x-naran-internal"] || ""));
+  const want = Buffer.from(INTERNAL_TOKEN);
+  if (got.length !== want.length || !timingSafeEqual(got, want)) {
+    res.status(403).json({ error: "Not allowed" });
+    return;
+  }
+  next();
+}
+
+const posInvoiceSchema = z.object({
+  amount: z.number().int().positive().max(100_000_000),
+  orderRef: z.string().min(1).max(64),
+  description: z.string().max(200).optional(),
+});
+
+router.post("/pos/invoice", internalOnly, intentCreateLimit, async (req, res) => {
+  const parsed = posInvoiceSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid request" }); return; }
+  const { amount, orderRef, description } = parsed.data;
+  try {
+    const inv = await botxonCreateInvoice({
+      amount,
+      orderRef,
+      description: description || `NARAN POS ${orderRef}`,
+    });
+    res.json({
+      invoiceId: inv.invoiceId, qrText: inv.qrText, qrImage: inv.qrImage,
+      shortUrl: inv.shortUrl, urls: inv.urls, amount,
+    });
+  } catch (e) {
+    Sentry.captureException(e);
+    res.status(502).json({ error: "Нэхэмжлэх үүсгэж чадсангүй" });
+  }
+});
+
+router.get("/pos/invoice", internalOnly, statusLimit, async (req, res) => {
+  const id = String(req.query.id || "");
+  if (!id) { res.status(400).json({ error: "id required" }); return; }
+  try {
+    const st = await botxonGetInvoice(id);
+    res.json({ status: st.status, amount: st.amount, orderRef: st.orderRef, paidAt: st.paidAt ?? null });
+  } catch (e) {
+    Sentry.captureException(e);
+    res.status(502).json({ error: "Төлөв шалгаж чадсангүй" });
+  }
+});
 
 export default router;
 

@@ -6,6 +6,7 @@ import {
   markPaymentCollectionAsPaid,
 } from "@medusajs/medusa/core-flows";
 import { decrementStockForVariants, stockForVariants } from "../../../lib/catalog";
+import { posInvoiceStatus } from "../../../lib/pos-payment";
 import { reserveOrderItems, fulfillOrder, shipOrder, deliverOrder } from "../../../lib/fulfillment";
 
 const CURRENCY = "mnt";
@@ -153,6 +154,31 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const scaledTotal = orderItems.reduce((a: number, i: any) => a + i.unit_price * i.quantity, 0);
   const effectiveDiscount = rawTotal - scaledTotal;
 
+  // QPay: the sale is only booked once the gateway confirms THIS invoice is paid
+  // AND the paid amount matches the ticket — so a till can never record an order
+  // against an unpaid, cancelled or cheaper invoice.
+  const qpayInvoiceId = String(body?.qpayInvoiceId || "").trim();
+  if (String(body?.paymentMethod || "") === "qpay") {
+    if (!qpayInvoiceId) {
+      res.status(400).json({ message: "QPay нэхэмжлэх олдсонгүй." });
+      return;
+    }
+    try {
+      const st = await posInvoiceStatus(qpayInvoiceId);
+      if (st.status !== "paid") {
+        res.status(402).json({ message: "Төлбөр хараахан баталгаажаагүй байна." });
+        return;
+      }
+      if (Math.round(Number(st.amount || 0)) !== scaledTotal) {
+        res.status(409).json({ message: "Төлсөн дүн тасалбарын дүнтэй таарахгүй байна." });
+        return;
+      }
+    } catch (e: any) {
+      res.status(502).json({ message: e?.message || "Төлбөр шалгаж чадсангүй" });
+      return;
+    }
+  }
+
   const regionModule = req.scope.resolve(Modules.REGION);
   const regions = await regionModule.listRegions({});
   const region = regions.find((r: any) => r.currency_code === CURRENCY) || regions[0];
@@ -186,6 +212,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           note: String(body?.note || "").slice(0, 500) || null,
           discount: effectiveDiscount || null,
           discount_code: String(body?.discountCode || "").slice(0, 60) || null,
+          qpay_invoice_id: qpayInvoiceId || null,
           recorded_by: (req as any).auth_context?.actor_id || null,
         },
       } as any,

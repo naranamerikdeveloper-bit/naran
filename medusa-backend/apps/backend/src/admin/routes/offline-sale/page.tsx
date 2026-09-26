@@ -20,6 +20,8 @@ type Category = { id: string; name: string; handle: string };
 type Product = { id: string; title: string; thumbnail: string; brand: string; gender: string; categories: Category[]; variants: Variant[] };
 // `max` = stock cap (null = unlimited / not tracked).
 type Line = { variant_id: string; title: string; unit_price: number; quantity: number; max: number | null };
+type BankUrl = { name?: string; description?: string; logo?: string; link: string };
+type QpayInvoice = { invoiceId: string; qrText: string; qrImage: string; shortUrl: string; urls: BankUrl[]; amount: number };
 
 async function adminFetch(path: string, init?: RequestInit) {
   const res = await fetch(`/admin${path}`, {
@@ -47,6 +49,8 @@ const isOut = (v: Variant) => v.manage && (v.stock ?? 0) <= 0;
 const OfflineSalePage = () => {
   const { loading: permLoading, can } = usePermissions();
   const searchRef = useRef<HTMLInputElement>(null);
+  // Guards against recording the same paid invoice twice.
+  const qpayDoneRef = useRef(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +73,11 @@ const OfflineSalePage = () => {
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  // QPay at the till: an invoice is minted, shown as a QR, and the sale is only
+  // recorded once the gateway confirms it paid.
+  const [qpay, setQpay] = useState<QpayInvoice | null>(null);
+  const [qpayStatus, setQpayStatus] = useState<"pending" | "paid" | "failed">("pending");
+  const [qpayBusy, setQpayBusy] = useState(false);
   const [last, setLast] = useState<Receipt | null>(null);
   const [today, setToday] = useState<{ count: number; total: number } | null>(null);
 
@@ -81,6 +90,31 @@ const OfflineSalePage = () => {
 
   useEffect(() => { loadSummary(); loadProducts(); }, []);
   useEffect(() => { searchRef.current?.focus(); }, []);
+
+  // Watch the QPay invoice; the sale is recorded the moment it reports paid.
+  useEffect(() => {
+    if (!qpay || qpayStatus !== "pending") return;
+    let stop = false;
+    const timer = setInterval(async () => {
+      if (stop) return;
+      try {
+        const s = await adminFetch(`/offline-sale/qpay?invoiceId=${encodeURIComponent(qpay.invoiceId)}`);
+        if (stop) return;
+        if (s.status === "paid") {
+          stop = true; clearInterval(timer);
+          if (!qpayDoneRef.current) {
+            qpayDoneRef.current = true;
+            await submit(qpay.invoiceId);
+            setQpay(null);
+          }
+        } else if (s.status === "failed") {
+          stop = true; clearInterval(timer);
+          setQpayStatus("failed");
+        }
+      } catch { /* transient network blip — keep polling */ }
+    }, 2500);
+    return () => { stop = true; clearInterval(timer); };
+  }, [qpay, qpayStatus]);
 
   // Categories that actually have products, with live counts.
   const categories = useMemo(() => {
@@ -164,6 +198,34 @@ const OfflineSalePage = () => {
   const change = paymentMethod === "cash" && cash !== "" ? cashNum - total : null;
   const cashShort = paymentMethod === "cash" && cash !== "" && cashNum < total;
 
+  // Mint a QPay invoice for the ticket; the server recomputes the amount.
+  const startQpay = async () => {
+    if (!lines.length) { toast.error("Дор хаяж нэг бараа сонгоно уу."); return; }
+    setQpayBusy(true);
+    try {
+      const r = await adminFetch("/offline-sale/qpay", {
+        method: "POST",
+        body: JSON.stringify({
+          items: lines.map(l => ({ variant_id: l.variant_id, quantity: l.quantity, unit_price: l.unit_price })),
+          discount: discount || undefined,
+        }),
+      });
+      qpayDoneRef.current = false;
+      setQpay({ ...r.invoice, amount: r.amount });
+      setQpayStatus("pending");
+    } catch (e: any) {
+      toast.error(e?.message || "QPay эхлүүлж чадсангүй");
+    } finally {
+      setQpayBusy(false);
+    }
+  };
+
+  const cancelQpay = () => { setQpay(null); setQpayStatus("pending"); };
+  // Botxon may hand back a data URL, a plain URL, or bare base64.
+  const qrSrc = qpay?.qrImage
+    ? (/^(data:|https?:)/i.test(qpay.qrImage) ? qpay.qrImage : `data:image/png;base64,${qpay.qrImage}`)
+    : "";
+
   const applyCode = async () => {
     const c = codeInput.trim().toUpperCase();
     if (!c) return;
@@ -184,7 +246,7 @@ const OfflineSalePage = () => {
     }
   };
 
-  async function submit() {
+  async function submit(qpayInvoiceId?: string) {
     if (!lines.length) { toast.error("Дор хаяж нэг бараа сонгоно уу."); return; }
     if (cashShort) { toast.error("Авсан бэлэн мөнгө нийт дүнгээс бага байна."); return; }
     setSaving(true);
@@ -198,6 +260,7 @@ const OfflineSalePage = () => {
           paymentMethod,
           discount: discount || undefined,
           discountCode: applied?.code || undefined,
+          qpayInvoiceId,
           note: note.trim() || undefined,
         }),
       });
@@ -485,9 +548,14 @@ const OfflineSalePage = () => {
               </div>
             )}
 
-            <Button variant="primary" className="mt-3 h-11 w-full" onClick={submit}
-              disabled={saving || !lines.length || cashShort} isLoading={saving}>
-              {lines.length ? `Төлбөр авах · ${tug(total)}` : "Төлбөр авах"}
+            <Button variant="primary" className="mt-3 h-11 w-full"
+              onClick={() => (paymentMethod === "qpay" ? startQpay() : submit())}
+              disabled={saving || qpayBusy || !lines.length || cashShort} isLoading={saving || qpayBusy}>
+              {!lines.length
+                ? "Төлбөр авах"
+                : paymentMethod === "qpay"
+                  ? `QPay QR үүсгэх · ${tug(total)}`
+                  : `Төлбөр авах · ${tug(total)}`}
             </Button>
 
             {last && (
@@ -502,6 +570,56 @@ const OfflineSalePage = () => {
           </div>
         </aside>
       </div>
+
+      {/* ---------- QPay ---------- */}
+      {qpay && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[17px] font-semibold">QPay-ээр төлөх</div>
+                <div className="mt-0.5 text-[13px] text-ui-fg-subtle">Худалдан авагч QR-ыг уншуулна уу</div>
+              </div>
+              <button type="button" onClick={cancelQpay} aria-label="Хаах" className="text-ui-fg-muted hover:text-ui-fg-base"><XMark /></button>
+            </div>
+
+            <div className="mt-4 text-center text-[28px] font-semibold tabular-nums">{tug(qpay.amount)}</div>
+
+            <div className="mt-4 grid place-items-center">
+              {qrSrc ? (
+                <img src={qrSrc} alt="QPay QR" className="h-56 w-56 rounded-xl border border-ui-border-base bg-white object-contain p-2" />
+              ) : (
+                <div className="w-full break-all rounded-xl bg-ui-bg-subtle p-3 text-center font-mono text-[11px]">
+                  {qpay.qrText || "QR бэлтгэгдэж байна…"}
+                </div>
+              )}
+            </div>
+
+            {qpay.urls?.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-2 text-[12px] font-medium text-ui-fg-subtle">Банкны аппаар нээх</div>
+                <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto">
+                  {qpay.urls.map((u, i) => (
+                    <a key={i} href={u.link} target="_blank" rel="noreferrer"
+                      className="truncate rounded-lg border border-ui-border-base px-3 py-2 text-[12.5px] hover:bg-ui-bg-subtle">
+                      {u.name || u.description || "Банк"}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <span className={`text-[13px] ${qpayStatus === "failed" ? "text-ui-tag-red-text" : "text-ui-fg-subtle"}`}>
+                {qpayStatus === "failed"
+                  ? "Төлбөр амжилтгүй боллоо"
+                  : saving ? "Захиалга бүртгэж байна…" : "Төлбөр хүлээгдэж байна…"}
+              </span>
+              <Button variant="secondary" size="small" onClick={cancelQpay} disabled={saving}>Болих</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

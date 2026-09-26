@@ -125,6 +125,7 @@ export default defineMiddlewares({
     { matcher: "/admin/fulfillment/*", methods: ["POST"], middlewares: [requirePermission("orders.write")] },
     { matcher: "/admin/offline-sale", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
     { matcher: "/admin/offline-sale", methods: ["POST"], middlewares: [requirePermission("orders.write")] },
+    { matcher: "/admin/offline-sale/qpay", methods: ["GET", "POST"], middlewares: [requirePermission("orders.write")] },
     { matcher: "/admin/crm/*", methods: ["GET"], middlewares: [requirePermission("customers.read")] },
     { matcher: "/admin/crm/*", methods: ["POST"], middlewares: [requirePermission("customers.write")] },
     { matcher: "/admin/cms/*", methods: ["GET", "POST"], middlewares: [requirePermission("content.write")] },
