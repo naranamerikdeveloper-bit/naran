@@ -185,6 +185,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           phone: String(body?.phone || "").slice(0, 40) || null,
           note: String(body?.note || "").slice(0, 500) || null,
           discount: effectiveDiscount || null,
+          discount_code: String(body?.discountCode || "").slice(0, 60) || null,
           recorded_by: (req as any).auth_context?.actor_id || null,
         },
       } as any,

@@ -63,6 +63,10 @@ const OfflineSalePage = () => {
   const [cash, setCash] = useState("");
   const [discMode, setDiscMode] = useState<"pct" | "amt">("pct");
   const [discVal, setDiscVal] = useState("");
+  // Discount code applied at the till (same codes the storefront accepts).
+  const [codeInput, setCodeInput] = useState("");
+  const [applied, setApplied] = useState<{ code: string; type: string; value: number } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [last, setLast] = useState<Receipt | null>(null);
@@ -146,11 +150,39 @@ const OfflineSalePage = () => {
   const subtotal = lines.reduce((a, l) => a + l.unit_price * l.quantity, 0);
   const count = lines.reduce((a, l) => a + l.quantity, 0);
   const discNum = Math.max(0, Math.round(Number(discVal) || 0));
-  const discount = Math.min(subtotal, discMode === "pct" ? Math.round(subtotal * Math.min(100, discNum) / 100) : discNum);
+  const manualDisc = discMode === "pct" ? Math.round(subtotal * Math.min(100, discNum) / 100) : discNum;
+  // A percentage code has to follow the ticket, so recompute it locally as the
+  // cart changes rather than freezing the amount the server first returned.
+  const codeDisc = applied
+    ? applied.type === "percentage"
+      ? Math.round((subtotal * Math.min(100, applied.value)) / 100)
+      : Math.round(applied.value)
+    : 0;
+  const discount = Math.min(subtotal, manualDisc + codeDisc);
   const total = subtotal - discount;
   const cashNum = Math.max(0, Math.round(Number(cash) || 0));
   const change = paymentMethod === "cash" && cash !== "" ? cashNum - total : null;
   const cashShort = paymentMethod === "cash" && cash !== "" && cashNum < total;
+
+  const applyCode = async () => {
+    const c = codeInput.trim().toUpperCase();
+    if (!c) return;
+    if (!subtotal) { toast.error("Эхлээд бараа сонгоно уу."); return; }
+    setChecking(true);
+    try {
+      const r = await adminFetch("/marketing/validate-code", {
+        method: "POST",
+        body: JSON.stringify({ code: c, subtotal }),
+      });
+      setApplied({ code: r.code, type: r.type, value: Number(r.value) });
+      setCodeInput("");
+      toast.success(`${r.code} код хэрэглэгдлээ`);
+    } catch (e: any) {
+      toast.error(e?.message || "Код буруу байна");
+    } finally {
+      setChecking(false);
+    }
+  };
 
   async function submit() {
     if (!lines.length) { toast.error("Дор хаяж нэг бараа сонгоно уу."); return; }
@@ -165,6 +197,7 @@ const OfflineSalePage = () => {
           phone: phone.trim() || undefined,
           paymentMethod,
           discount: discount || undefined,
+          discountCode: applied?.code || undefined,
           note: note.trim() || undefined,
         }),
       });
@@ -177,6 +210,7 @@ const OfflineSalePage = () => {
       setLast(receipt);
       toast.success(`Борлуулалт бүртгэгдлээ (${no}) · ${tug(r.total ?? total)}`);
       setLines([]); setCustomerName(""); setPhone(""); setNote(""); setPaymentMethod("cash"); setCash(""); setDiscVal("");
+      setApplied(null); setCodeInput("");
       loadSummary();
       loadProducts(); // refresh stock after the sale
     } catch (e: any) {
@@ -375,6 +409,29 @@ const OfflineSalePage = () => {
 
           {/* Totals + payment */}
           <div className="shrink-0 border-t border-ui-border-base px-5 py-4">
+            {/* Discount code — the very same codes the storefront accepts */}
+            <div className="mb-2">
+              {applied ? (
+                <div className="flex items-center justify-between rounded-lg bg-ui-tag-green-bg px-3 py-2">
+                  <span className="text-[12.5px] font-medium text-ui-tag-green-text">
+                    {applied.code} · {applied.type === "percentage" ? `${applied.value}%` : tug(applied.value)}
+                  </span>
+                  <button type="button" onClick={() => setApplied(null)}
+                    className="text-[12px] text-ui-tag-green-text hover:opacity-80">Хасах</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input value={codeInput} size="small" placeholder="Хямдралын код"
+                    onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyCode(); } }}
+                    className="flex-1" />
+                  <Button variant="secondary" size="small" onClick={applyCode} isLoading={checking} disabled={!codeInput.trim()}>
+                    Хэрэглэх
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="mb-3 flex items-center gap-2">
               <span className="shrink-0 text-[12.5px] font-medium text-ui-fg-subtle">Хямдрал</span>
               <Input inputMode="numeric" value={discVal} onChange={e => setDiscVal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" size="small" className="flex-1" />

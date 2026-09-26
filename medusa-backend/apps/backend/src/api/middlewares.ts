@@ -130,6 +130,12 @@ export default defineMiddlewares({
     { matcher: "/admin/cms/*", methods: ["GET", "POST"], middlewares: [requirePermission("content.write")] },
     { matcher: "/admin/reports/*", methods: ["GET"], middlewares: [requirePermission("reports.read")] },
     { matcher: "/admin/marketing/*", methods: ["GET"], middlewares: [requirePermission("promotions.write")] },
+    // Cashiers must be able to check a discount code at the till, so this one
+    // POST is gated on the POS permission rather than promotions.write.
+    { matcher: "/admin/marketing/validate-code", methods: ["POST"], middlewares: [requirePermission("orders.write")] },
+    // Core promotion CRUD (the discount-code screen writes through it).
+    { matcher: "/admin/promotions", methods: ["POST"], middlewares: [requirePermission("promotions.write")] },
+    { matcher: "/admin/promotions/:id", methods: ["POST", "DELETE"], middlewares: [requirePermission("promotions.write")] },
     { matcher: "/admin/audit", methods: ["GET"], middlewares: [requirePermission("team.manage")] },
     { matcher: "/admin/naran-notifications", methods: ["GET"], middlewares: [requirePermission("orders.read")] },
     { matcher: "/admin/returns/:id/approve", methods: ["POST"], middlewares: [requirePermission("returns.write")] },
