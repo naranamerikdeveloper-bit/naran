@@ -48,11 +48,11 @@ async function adminFetch(path: string, init?: RequestInit) {
 
 // Payment methods as visible choices (not a dropdown) — a cashier picks one at a
 // glance, and QPay is impossible to miss.
-const PAYMENTS: { value: string; label: string; icon: string }[] = [
-  { value: "cash", label: PAY_LABEL.cash, icon: "₮" },
-  { value: "qpay", label: PAY_LABEL.qpay, icon: "QR" },
-  { value: "card", label: PAY_LABEL.card, icon: "▭" },
-  { value: "transfer", label: PAY_LABEL.transfer, icon: "⇄" },
+const PAYMENTS: { value: string; label: string }[] = [
+  { value: "cash", label: "Бэлэн" },
+  { value: "qpay", label: "QPay" },
+  { value: "card", label: "Карт" },
+  { value: "transfer", label: "Шилжүүлэг" },
 ];
 
 // Exactly the storefront's nav categories, so the shop floor and the website
@@ -89,6 +89,10 @@ const OfflineSalePage = () => {
   const [codeInput, setCodeInput] = useState("");
   const [applied, setApplied] = useState<{ code: string; type: string; value: number } | null>(null);
   const [checking, setChecking] = useState(false);
+  // Progressive disclosure: the ticket stays calm until the cashier needs these.
+  const [openCode, setOpenCode] = useState(false);
+  const [openDisc, setOpenDisc] = useState(false);
+  const [openCust, setOpenCust] = useState(false);
   const [saving, setSaving] = useState(false);
   const [qpay, setQpay] = useState<QpayInvoice | null>(null);
   const [qpayStatus, setQpayStatus] = useState<"pending" | "paid" | "failed">("pending");
@@ -415,150 +419,175 @@ const OfflineSalePage = () => {
         </main>
 
         {/* ---------- Ticket ---------- */}
-        <aside className="flex w-[390px] shrink-0 flex-col border-l border-ui-border-base bg-white 2xl:w-[430px]">
-          <div className="flex items-center justify-between px-5 py-4" style={{ background: BRAND.soft }}>
+        <aside className="flex w-[380px] shrink-0 flex-col bg-white 2xl:w-[420px]" style={{ borderLeft: "1px solid rgba(0,0,0,.07)" }}>
+          {/* Header — quiet label, no heavy tint */}
+          <div className="flex items-baseline justify-between px-6 pb-4 pt-6">
             <div>
-              <div className="text-[16px] font-semibold" style={{ color: BRAND.deep }}>Төлбөр</div>
-              <div className="mt-0.5 text-[11.5px]" style={{ color: BRAND.deep, opacity: .75 }}>{new Date().toLocaleDateString("mn-MN")}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[.2em] text-ui-fg-muted">Тасалбар</div>
+              <div className="mt-1.5 text-[12px] text-ui-fg-muted">{new Date().toLocaleDateString("mn-MN")}</div>
             </div>
-            <div className="text-right">
-              <div className="text-[11px]" style={{ color: BRAND.deep, opacity: .75 }}>Сонгосон</div>
-              <div className="text-[15px] font-semibold tabular-nums" style={{ color: BRAND.deep }}>{count} ширхэг</div>
-            </div>
+            {count > 0 && <div className="text-[13px] tabular-nums text-ui-fg-subtle">{count} ширхэг</div>}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          {/* Items — hairline rows, no boxes */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6">
             {lines.length === 0 ? (
-              <div className="grid place-items-center py-16 text-center">
-                <div className="mb-2 grid h-12 w-12 place-items-center rounded-full text-ui-fg-muted" style={{ background: BRAND.soft }}><ShoppingBag /></div>
-                <div className="text-sm font-medium">Сагс хоосон байна</div>
-                <div className="mt-1 text-[12.5px] text-ui-fg-subtle">Зүүн талаас бараа сонгоно уу.</div>
+              <div className="flex h-full flex-col items-center justify-center gap-2 pb-20 text-center">
+                <div className="grid h-11 w-11 place-items-center rounded-full text-ui-fg-muted" style={{ background: "#F6F3F2" }}>
+                  <ShoppingBag />
+                </div>
+                <div className="text-[13.5px] font-medium">Сагс хоосон</div>
+                <div className="text-[12.5px] text-ui-fg-muted">Зүүн талаас бараа сонгоно уу</div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {lines.map(l => (
-                  <div key={l.variant_id} className="rounded-xl border p-3" style={{ borderColor: "rgba(0,0,0,.07)" }}>
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1 text-[13px] font-medium leading-snug">{l.title}</div>
-                      <button type="button" onClick={() => removeLine(l.variant_id)} aria-label="Хасах"
-                        className="shrink-0 text-ui-fg-muted hover:text-ui-fg-error"><XMark /></button>
+              <div className="pb-2">
+                {lines.map((l, i) => (
+                  <div key={l.variant_id} className="group py-3.5"
+                    style={i === 0 ? undefined : { borderTop: "1px solid rgba(0,0,0,.05)" }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 text-[13px] leading-snug">{l.title}</div>
+                      <div className="shrink-0 text-[13.5px] font-semibold tabular-nums">{tug(l.unit_price * l.quantity)}</div>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => decVariant(l.variant_id)}
-                          className="grid h-7 w-7 place-items-center rounded-full border" style={{ borderColor: "rgba(0,0,0,.1)" }}>−</button>
-                        <input type="number" min={1} max={l.max ?? undefined} value={l.quantity}
-                          onChange={e => {
-                            const n = Math.max(1, Math.round(Number(e.target.value) || 1));
-                            if (l.max != null && n > l.max) { toast.error(`Зөвхөн ${l.max} ширхэг үлдсэн.`); setLine(l.variant_id, { quantity: l.max }); return; }
-                            setLine(l.variant_id, { quantity: n });
-                          }}
-                          className="h-7 w-11 rounded border bg-white text-center text-[13px] tabular-nums outline-none focus:border-[#E76F61]"
-                          style={{ borderColor: "rgba(0,0,0,.12)" }} />
+                      <div className="flex items-center gap-2.5">
+                        <button type="button" onClick={() => decVariant(l.variant_id)} aria-label="Хасах"
+                          className="grid h-6 w-6 place-items-center rounded-full text-[15px] leading-none text-ui-fg-subtle transition hover:bg-[#F6F3F2]">−</button>
+                        <span className="min-w-[14px] text-center text-[13px] font-medium tabular-nums">{l.quantity}</span>
                         <button type="button" onClick={() => setLine(l.variant_id, { quantity: l.max != null ? Math.min(l.max, l.quantity + 1) : l.quantity + 1 })}
-                          disabled={l.max != null && l.quantity >= l.max}
-                          className="grid h-7 w-7 place-items-center rounded-full border disabled:opacity-40" style={{ borderColor: "rgba(0,0,0,.1)" }}>+</button>
+                          disabled={l.max != null && l.quantity >= l.max} aria-label="Нэмэх"
+                          className="grid h-6 w-6 place-items-center rounded-full text-[15px] leading-none text-ui-fg-subtle transition hover:bg-[#F6F3F2] disabled:opacity-30">+</button>
+                        <span className="text-[11.5px] text-ui-fg-muted">× {tug(l.unit_price)}</span>
                       </div>
-                      <div className="text-[14px] font-semibold tabular-nums">{tug(l.unit_price * l.quantity)}</div>
+                      <button type="button" onClick={() => removeLine(l.variant_id)}
+                        className="text-[11.5px] text-ui-fg-muted opacity-0 transition hover:text-ui-fg-error group-hover:opacity-100">
+                        Устгах
+                      </button>
                     </div>
                   </div>
                 ))}
                 <button type="button" onClick={() => setLines([])}
-                  className="self-end px-1 py-1 text-[12px] text-ui-fg-muted hover:text-ui-fg-base">Сагс цэвэрлэх</button>
+                  className="mt-2 text-[12px] text-ui-fg-muted transition hover:text-ui-fg-base">Сагс цэвэрлэх</button>
               </div>
             )}
           </div>
 
-          {/* Totals + payment */}
-          <div className="shrink-0 border-t border-ui-border-base px-5 py-4">
-            <div className="mb-2">
-              {applied ? (
-                <div className="flex items-center justify-between rounded-lg bg-ui-tag-green-bg px-3 py-2">
-                  <span className="text-[12.5px] font-medium text-ui-tag-green-text">
-                    {applied.code} · {applied.type === "percentage" ? `${applied.value}%` : tug(applied.value)}
-                  </span>
-                  <button type="button" onClick={() => setApplied(null)} className="text-[12px] text-ui-tag-green-text hover:opacity-80">Хасах</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Input value={codeInput} size="small" placeholder="Хямдралын код"
-                    onChange={e => setCodeInput(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyCode(); } }}
-                    className="flex-1" />
-                  <Button variant="secondary" size="small" onClick={applyCode} isLoading={checking} disabled={!codeInput.trim()}>Хэрэглэх</Button>
-                </div>
+          {/* Summary + payment */}
+          <div className="px-6 pb-6 pt-4" style={{ borderTop: "1px solid rgba(0,0,0,.07)" }}>
+            {/* Optional fields stay out of the way until asked for */}
+            <div className="mb-3 flex items-center gap-3 text-[12px]">
+              {!applied && (
+                <button type="button" onClick={() => setOpenCode(v => !v)}
+                  className="transition hover:opacity-70" style={{ color: openCode ? BRAND.deep : "#8A8A8A" }}>Код</button>
               )}
+              <button type="button" onClick={() => setOpenDisc(v => !v)}
+                className="transition hover:opacity-70" style={{ color: openDisc ? BRAND.deep : "#8A8A8A" }}>Хямдрал</button>
+              <button type="button" onClick={() => setOpenCust(v => !v)}
+                className="transition hover:opacity-70" style={{ color: openCust ? BRAND.deep : "#8A8A8A" }}>Харилцагч</button>
             </div>
 
-            <div className="mb-3 flex items-center gap-2">
-              <span className="shrink-0 text-[12.5px] font-medium text-ui-fg-subtle">Хямдрал</span>
-              <Input inputMode="numeric" value={discVal} onChange={e => setDiscVal(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" size="small" className="flex-1" />
-              <div className="flex overflow-hidden rounded-md border" style={{ borderColor: "rgba(0,0,0,.12)" }}>
-                {(["pct", "amt"] as const).map(m => (
-                  <button key={m} type="button" onClick={() => setDiscMode(m)}
-                    className="px-2.5 py-1 text-[12px] transition"
-                    style={discMode === m ? { background: BRAND.soft, color: BRAND.deep, fontWeight: 600 } : { background: "#F7F7F8", color: "#6B7280" }}>
-                    {m === "pct" ? "%" : "₮"}
-                  </button>
-                ))}
+            {applied && (
+              <div className="mb-3 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: BRAND.soft }}>
+                <span className="text-[12.5px] font-medium" style={{ color: BRAND.deep }}>
+                  {applied.code} · {applied.type === "percentage" ? `${applied.value}%` : tug(applied.value)}
+                </span>
+                <button type="button" onClick={() => setApplied(null)} className="text-[12px]" style={{ color: BRAND.deep, opacity: .7 }}>Хасах</button>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-1 text-[13px]">
-              <div className="flex items-center justify-between">
-                <span className="text-ui-fg-subtle">Дүн</span><span className="tabular-nums">{tug(subtotal)}</span>
+            {openCode && !applied && (
+              <div className="mb-3 flex items-center gap-2">
+                <input value={codeInput} placeholder="Хямдралын код"
+                  onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyCode(); } }}
+                  className="h-10 flex-1 rounded-lg px-3 text-[13px] outline-none transition focus:bg-white"
+                  style={{ background: "#F6F3F2" }} />
+                <button type="button" onClick={applyCode} disabled={!codeInput.trim() || checking}
+                  className="h-10 rounded-lg px-3.5 text-[12.5px] font-medium transition disabled:opacity-40"
+                  style={{ background: BRAND.soft, color: BRAND.deep }}>
+                  {checking ? "…" : "Хэрэглэх"}
+                </button>
               </div>
-              {discount > 0 && (
+            )}
+
+            {openDisc && (
+              <div className="mb-3 flex items-center gap-2">
+                <input inputMode="numeric" value={discVal} placeholder="Хямдралын дүн"
+                  onChange={e => setDiscVal(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="h-10 flex-1 rounded-lg px-3 text-[13px] tabular-nums outline-none transition focus:bg-white"
+                  style={{ background: "#F6F3F2" }} />
+                <div className="flex h-10 overflow-hidden rounded-lg" style={{ background: "#F6F3F2" }}>
+                  {(["pct", "amt"] as const).map(m => (
+                    <button key={m} type="button" onClick={() => setDiscMode(m)}
+                      className="w-10 text-[12.5px] transition"
+                      style={discMode === m ? { background: "#fff", color: BRAND.deep, fontWeight: 600 } : { color: "#8A8A8A" }}>
+                      {m === "pct" ? "%" : "₮"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {openCust && (
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Нэр"
+                  className="h-10 rounded-lg px-3 text-[13px] outline-none transition focus:bg-white" style={{ background: "#F6F3F2" }} />
+                <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Утас"
+                  className="h-10 rounded-lg px-3 text-[13px] outline-none transition focus:bg-white" style={{ background: "#F6F3F2" }} />
+              </div>
+            )}
+
+            {/* Totals */}
+            {discount > 0 && (
+              <div className="mb-1 space-y-1 text-[12.5px]">
+                <div className="flex items-center justify-between text-ui-fg-muted">
+                  <span>Дүн</span><span className="tabular-nums">{tug(subtotal)}</span>
+                </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-ui-fg-subtle">Хямдрал</span>
+                  <span className="text-ui-fg-muted">Хямдрал</span>
                   <span className="tabular-nums" style={{ color: BRAND.deep }}>−{tug(discount)}</span>
                 </div>
-              )}
-              <div className="flex items-center justify-between pt-1.5">
-                <span className="text-[15px] font-semibold">Нийт</span>
-                <span className="text-[22px] font-semibold tabular-nums" style={{ color: BRAND.deep }}>{tug(total)}</span>
               </div>
+            )}
+            <div className="flex items-baseline justify-between py-2">
+              <span className="text-[13px] text-ui-fg-subtle">Нийт</span>
+              <span className="text-[26px] font-semibold leading-none tabular-nums">{tug(total)}</span>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Харилцагч" size="small" />
-              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Утас" size="small" />
-            </div>
-
-            {/* Payment method — visible choices, so QPay is one tap away */}
-            <div className="mt-3 grid grid-cols-4 gap-1.5">
+            {/* Payment method — quiet segmented control */}
+            <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl p-1" style={{ background: "#F6F3F2" }}>
               {PAYMENTS.map(pm => {
                 const on = paymentMethod === pm.value;
                 return (
                   <button key={pm.value} type="button" onClick={() => setPaymentMethod(pm.value)}
-                    className="flex flex-col items-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-medium transition"
+                    className="rounded-lg py-2 text-[12px] font-medium transition"
                     style={on
-                      ? { background: BRAND.soft, borderColor: BRAND.accent, color: BRAND.deep }
-                      : { background: "#fff", borderColor: "rgba(0,0,0,.1)", color: "#6B7280" }}>
-                    <span className="text-[13px] font-bold leading-none">{pm.icon}</span>
-                    <span className="leading-none">{pm.label}</span>
+                      ? { background: "#fff", color: BRAND.deep, boxShadow: "0 1px 2px rgba(0,0,0,.07)" }
+                      : { color: "#8A8A8A" }}>
+                    {pm.label}
                   </button>
                 );
               })}
             </div>
 
             {paymentMethod === "cash" && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <Input inputMode="numeric" value={cash} onChange={e => setCash(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Авсан мөнгө" size="small" />
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {[total, 20000, 50000, 100000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map(v => (
-                      <button key={v} type="button" onClick={() => setCash(String(v))}
-                        className="rounded px-1.5 py-0.5 text-[11px]" style={{ background: BRAND.soft, color: BRAND.deep }}>
-                        {v === total ? "Яг таг" : tug(v)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className={`grid h-9 place-items-center rounded-lg px-2 text-[14px] font-semibold tabular-nums ${
-                  cashShort ? "bg-ui-tag-red-bg text-ui-tag-red-text" : "bg-ui-tag-green-bg text-ui-tag-green-text"
-                }`}>
-                  {cash === "" ? "Хариулт —" : cashShort ? `Дутуу ${tug(total - cashNum)}` : `Хариулт ${tug(change ?? 0)}`}
+              <div className="mt-3">
+                <input inputMode="numeric" value={cash} placeholder="Авсан мөнгө"
+                  onChange={e => setCash(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="h-10 w-full rounded-lg px-3 text-[13px] tabular-nums outline-none transition focus:bg-white"
+                  style={{ background: "#F6F3F2" }} />
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {[total, 20000, 50000, 100000].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map(v => (
+                    <button key={v} type="button" onClick={() => setCash(String(v))}
+                      className="text-[11.5px] text-ui-fg-muted transition hover:opacity-70" style={{ color: BRAND.deep }}>
+                      {v === total ? "Яг таг" : tug(v)}
+                    </button>
+                  ))}
+                  {cash !== "" && (
+                    <span className="ml-auto text-[12.5px] tabular-nums"
+                      style={{ color: cashShort ? "#C0392B" : "#1F7A4D" }}>
+                      {cashShort ? `Дутуу ${tug(total - cashNum)}` : `Хариулт ${tug(change ?? 0)}`}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -566,8 +595,8 @@ const OfflineSalePage = () => {
             <button type="button"
               onClick={() => (paymentMethod === "qpay" ? startQpay() : submit())}
               disabled={saving || qpayBusy || !lines.length || cashShort}
-              className="mt-3 h-12 w-full rounded-xl text-[15px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-45"
-              style={{ background: BRAND.grad, boxShadow: "0 12px 24px -14px rgba(211,90,76,.9)" }}>
+              className="mt-4 h-12 w-full rounded-xl text-[14.5px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ background: BRAND.grad, boxShadow: "0 10px 22px -14px rgba(211,90,76,.9)" }}>
               {saving || qpayBusy
                 ? "Түр хүлээнэ үү…"
                 : !lines.length
@@ -578,11 +607,11 @@ const OfflineSalePage = () => {
             </button>
 
             {last && (
-              <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: BRAND.soft }}>
-                <span className="text-[12px]" style={{ color: BRAND.deep }}>Сүүлд: <b>{last.no}</b> · {tug(last.total)}</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => printReceipt(last, naranLogo)} className="text-[12px] font-semibold" style={{ color: BRAND.deep }}>Баримт</button>
-                  <button type="button" onClick={() => setLast(null)} className="text-[12px] text-ui-fg-muted">Хаах</button>
+              <div className="mt-3 flex items-center justify-between text-[12px]">
+                <span className="text-ui-fg-muted">Сүүлд <b className="font-semibold text-ui-fg-base">{last.no}</b> · {tug(last.total)}</span>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => printReceipt(last, naranLogo)} className="font-medium" style={{ color: BRAND.deep }}>Баримт</button>
+                  <button type="button" onClick={() => setLast(null)} className="text-ui-fg-muted">Хаах</button>
                 </div>
               </div>
             )}
