@@ -248,15 +248,66 @@ const CYR_MAP: Record<string, string> = {
   м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
 };
 const HAS_CYRILLIC = /[Ѐ-ӿ]/;
-function translitQuery(q: string): string {
-  if (!HAS_CYRILLIC.test(q)) return q;
-  return q.toLowerCase().split("").map(ch => (ch in CYR_MAP ? CYR_MAP[ch] : ch)).join("");
+
+// Transliteration alone isn't enough: MeiliSearch never tolerates a typo on the
+// FIRST letter of a word, so "шанел" → "shanel" still misses "Chanel". These map
+// the common Mongolian/Cyrillic renderings of the brands we actually carry onto
+// their catalogue spelling. Latin input gets the same treatment, so someone
+// typing "shanel" directly is helped too.
+const BRAND_ALIASES: Record<string, string> = {
+  shanel: "chanel", shanell: "chanel", shanelle: "chanel", chanell: "chanel",
+  versache: "versace", versachi: "versace", versach: "versace",
+  guchchi: "gucci", guchi: "gucci",
+  jivanshi: "givenchy", djivanshi: "givenchy", jivanchi: "givenchy",
+  lankom: "lancome", lankome: "lancome",
+  gerlen: "guerlain", guerlen: "guerlain",
+  dolche: "dolce",
+  hyugo: "hugo",
+  kalvin: "calvin", klyain: "klein", klyayn: "klein", klain: "klein",
+  berberri: "burberry", byorberri: "burberry", burberri: "burberry",
+  moskino: "moschino",
+  lakost: "lacoste",
+  eskada: "escada",
+  gess: "guess",
+  krid: "creed",
+  bayredo: "byredo",
+  karolina: "carolina",
+  este: "estee",
+  jimmi: "jimmy",
+  devidoff: "davidoff",
+  kouch: "coach",
+  britni: "britney", spirs: "spears",
+  keti: "katy", perri: "perry",
+  dskvared: "dsquared",
+  elizabet: "elizabeth",
+  jusi: "juicy", kutyur: "couture",
+  loran: "laurent",
+  valentin: "valentino",
+};
+
+// Abbreviations / whole-phrase spellings that don't survive word-by-word mapping.
+const PHRASE_ALIASES: Record<string, string> = {
+  ysl: "yves saint laurent",
+  "iv sen loran": "yves saint laurent",
+  dg: "dolce gabbana",
+  "d g": "dolce gabbana",
+  ck: "calvin klein",
+};
+
+function normalizeQuery(q: string): string {
+  let s = q.trim().toLowerCase();
+  if (HAS_CYRILLIC.test(s)) {
+    s = s.split("").map(ch => (ch in CYR_MAP ? CYR_MAP[ch] : ch)).join("");
+  }
+  s = s.replace(/\s+/g, " ").trim();
+  if (PHRASE_ALIASES[s]) return PHRASE_ALIASES[s];
+  return s.split(" ").map(w => BRAND_ALIASES[w] ?? w).join(" ");
 }
 
 // endpoint, which hydrates full products (with prices). Any failure — or Meili
 // disabled — falls back to Medusa's built-in `q` search so search never breaks.
 async function searchProducts(q: string, limit = 100, revalidate?: number): Promise<Product[]> {
-  const query = translitQuery(q);
+  const query = normalizeQuery(q);
   if (MEILI_ENABLED) {
     try {
       const p = new URLSearchParams({ query, region_id: REGION, fields: FIELDS, limit: String(limit) });
