@@ -10,6 +10,7 @@ import { useT, useLang } from "./LangProvider";
 import { LangToggle } from "./LangToggle";
 import { SearchBox } from "./SearchBox";
 import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useNavMenu, useMenuLabel } from "./NavMenuProvider";
 
 // Small circular icon button that carries an animated count badge (shared by the
 // wishlist + cart controls).
@@ -27,15 +28,6 @@ function CountBadge({ count }: { count: number }) {
     </AnimatePresence>
   );
 }
-
-// The storefront's audience categories — shared by the desktop pill and the
-// mobile drawer so both always show the same four entries.
-const NAV_LINKS: [string, string][] = [
-  ["/shop?gender=men", "nav.men"],
-  ["/shop?gender=women", "nav.women"],
-  ["/shop?sort=new", "nav.new"],
-  ["/shop?gender=gift", "gender.gift"],
-];
 
 export function Nav() {
   const pathname = usePathname();
@@ -58,6 +50,12 @@ export function Nav() {
   const count = mounted ? items.reduce((a, b) => a + b.qty, 0) : 0;
   const wishCount = mounted ? wishIds.length : 0;
   const t = useT();
+  // The storefront's categories, shared by the desktop pill and the mobile
+  // drawer so both always agree. They come from the layout (owner-editable in
+  // the admin); the provider falls back to the built-in four when the owner has
+  // not configured a menu.
+  const navLinks = useNavMenu();
+  const labelOf = useMenuLabel();
   const lang = useLang();
 
   // Mobile category drawer (slides in from the left). Closes on navigation and
@@ -175,10 +173,10 @@ export function Nav() {
               <div className="px-3 py-4 overflow-y-auto">
                 <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[.18em] text-subtle">{t("home.category")}</div>
                 <nav className="flex flex-col">
-                  {NAV_LINKS.map(([h, k]) => (
-                    <Link key={k} href={h} onClick={() => setMenuOpen(false)}
+                  {navLinks.map((m, i) => (
+                    <Link key={m.href + i} href={m.href} onClick={() => setMenuOpen(false)}
                       className="flex items-center justify-between rounded-xl px-4 py-3.5 text-[15px] font-medium text-ink hover:bg-surface-2 transition-colors">
-                      {t(k)}
+                      {labelOf(m)}
                       <span className="text-subtle"><ArrowUpRight width={15} height={15}/></span>
                     </Link>
                   ))}
@@ -215,10 +213,10 @@ export function Nav() {
         {/* Links wrap onto a clipped second line when space runs out, so a link
             either shows whole or not at all — never squeezes the logo. */}
         <div className="flex flex-wrap items-start gap-x-4 xl:gap-x-6 gap-y-8 h-7 pt-1 overflow-hidden min-w-0">
-          {NAV_LINKS.map(([h, k]) => (
-            <Link key={k} href={h}
-              aria-current={isActive(h) ? "page" : undefined}
-              className={`relative inline-flex whitespace-nowrap text-[12px] uppercase tracking-[.1em] xl:tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${isActive(h)?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{t(k)}</Link>
+          {navLinks.map((m, i) => (
+            <Link key={m.href + i} href={m.href}
+              aria-current={isActive(m.href) ? "page" : undefined}
+              className={`relative inline-flex whitespace-nowrap text-[12px] uppercase tracking-[.1em] xl:tracking-[.12em] font-medium transition-colors after:absolute after:left-0 after:-bottom-1.5 after:h-[1.5px] after:bg-accent after:transition-all after:duration-300 after:ease-elegant hover:after:w-full ${isActive(m.href)?"text-ink after:w-full":"text-muted hover:text-ink after:w-0"}`}>{labelOf(m)}</Link>
           ))}
         </div>
 

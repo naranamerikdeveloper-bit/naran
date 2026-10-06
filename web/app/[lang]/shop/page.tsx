@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
 import { ArrowRight, SearchIcon } from "@/components/Icons";
 import { api } from "@/lib/api";
+import { medusa } from "@/lib/medusa";
 import { tFor, type Lang } from "@/lib/i18n";
 import type { ListResult, Product } from "@/lib/types";
 import { SortSelect, ShopFilters } from "./_ShopControls";
@@ -93,6 +94,15 @@ export default async function ShopPage({
   const catCount = new Map(facets.categories.map(c => [c.key, c.count]));
   const tabs = cats.filter(c => c === "all" || (catCount.get(c) ?? 0) > 0 || searchParams.category === c);
   const allCount = facets.categories.reduce((a, c) => a + c.count, 0);
+  // An owner-added navbar category links to ?category=<handle>, which is not
+  // one of the five built-in tabs. Give it its own chip (labelled from the menu)
+  // so the shopper can see which filter they are in and click out of it.
+  const customCat = searchParams.category && !cats.includes(searchParams.category)
+    ? (await medusa.navMenu())?.find(m => (m.href || "").includes(`category=${searchParams.category}`)) ?? null
+    : null;
+  const customLabel = customCat
+    ? (params.lang === "en" ? customCat.label?.en || customCat.label?.mn : customCat.label?.mn || customCat.label?.en) || ""
+    : "";
 
   return (
     <>
@@ -130,6 +140,12 @@ export default async function ShopPage({
                     </Link>
                   );
                 })}
+                {customLabel && (
+                  <span className="h-9 px-4 rounded-pill text-[13px] font-medium inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-accent-deep text-white">
+                    {customLabel}
+                    <span className="text-[11px] num-tabular opacity-70">{total}</span>
+                  </span>
+                )}
               </div>
               <div className="shrink-0">
                 <SortSelect/>

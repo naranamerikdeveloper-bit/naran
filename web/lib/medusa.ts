@@ -143,7 +143,10 @@ function map(m: any): Product {
   const fragranceType: string | undefined = meta.fragrance_type || undefined;
   // Category comes from Medusa's product categories (source of truth); the
   // enrich map is a fallback for products that predate the taxonomy.
-  const catHandle = (m.categories || [])[0]?.handle as string | undefined;
+  const categoryHandles: string[] = (m.categories || [])
+    .map((c: any) => c?.handle)
+    .filter((h: any): h is string => typeof h === "string" && !!h);
+  const catHandle = categoryHandles[0];
   const category: Category = (catHandle && HANDLE_TO_CATEGORY[catHandle]) || e.category;
   const prices = (m.variants || [])
     .map((v: any) => v?.calculated_price?.calculated_amount)
@@ -214,6 +217,7 @@ function map(m: any): Product {
     ] as [string, string | undefined][]).filter(([, v]) => v) as [string, string][]),
     brand,
     fragranceType,
+    categoryHandles,
     createdAt: m.created_at,
     stock,
     accent: e.accent,
@@ -381,7 +385,11 @@ export const medusa = {
       const base: Product[] = q ? (await searchProducts(q)).filter(p => !!p.image) : await fetchCatalog();
 
       // Predicates, so each facet can be counted with all the OTHER filters on.
-      const byCat = (p: Product) => !wantCat || p.category === wantCat;
+      // `category` accepts either a legacy taxonomy key ("Fragrance") or a raw
+      // Medusa category handle ("busad") — the latter is what an owner-added
+      // navbar item links to, and a product can sit in several categories.
+      const byCat = (p: Product) =>
+        !wantCat || p.category === wantCat || (p.categoryHandles || []).includes(wantCat);
       const byBrand = (p: Product) => !brands.length || (!!p.brand && brands.includes(p.brand));
       const byType = (p: Product) => !types.length || (!!p.fragranceType && types.includes(p.fragranceType));
       // Variant sizes are messy ("50ml · Amor Amor", "50 мл", "3.4oz") — reduce
@@ -734,9 +742,32 @@ export const medusa = {
       return null;
     }
   },
+
+  // Owner-editable navbar (admin → Контент → Сайтын цэс). Returns null on any
+  // failure so Nav/Footer fall back to their built-in four categories.
+  navMenu: async (): Promise<CmsNavItem[] | null> => {
+    try {
+      // The root layout awaits this on EVERY page, so it must never hang the
+      // site: unlike mfetch this has a hard deadline and no retry — a slow or
+      // down backend falls through to the storefront's built-in menu.
+      const res = await fetch(`${URL}/store/cms/nav`, {
+        headers: H,
+        next: { revalidate: BROWSE_REVALIDATE, tags: ["cms"] },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) throw new Error(`Medusa ${res.status}`);
+      const { items } = await res.json();
+      return Array.isArray(items) && items.length ? (items as CmsNavItem[]) : null;
+    } catch {
+      return null;
+    }
+  },
 };
 
 export type CmsBi = { mn: string; en: string };
 export type CmsSlide = { kicker: CmsBi; top: CmsBi; accent: CmsBi; desc: CmsBi; img: string; href: string };
 export type CmsPromo = { enabled: boolean; kicker: CmsBi; title: CmsBi; desc: CmsBi; cta: CmsBi; href: string; img: string };
 export type HomepageCms = { hero: CmsSlide[]; promo: CmsPromo };
+// One storefront menu item. `i18nKey` is set on the four built-ins so they keep
+// being translated; owner-added items carry literal MN/EN labels instead.
+export type CmsNavItem = { id: string; label: CmsBi; href: string; i18nKey?: string; category_id?: string; enabled?: boolean };

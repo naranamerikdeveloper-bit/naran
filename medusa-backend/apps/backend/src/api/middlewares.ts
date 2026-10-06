@@ -159,6 +159,12 @@ export default defineMiddlewares({
     // Per-variant images (Хувилбарын зураг) write through the core variant route.
     { matcher: "/admin/products/:id/variants/:variantId", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
 
+    // Taxonomy. The navbar editor creates categories through /admin/catalog/categories
+    // (already covered above); these guard the core routes so a cashier cannot
+    // reshape the catalog tree directly.
+    { matcher: "/admin/product-categories", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },
+    { matcher: "/admin/product-categories/:id", methods: ["POST", "DELETE"], middlewares: [requirePermission("catalog.write")] },
+
     // --- Admin file uploads ---
     { matcher: "/admin/uploads", methods: ["POST"], middlewares: [guardUpload] },
     { matcher: "/admin/uploads/presigned-urls", methods: ["POST"], middlewares: [requirePermission("catalog.write")] },

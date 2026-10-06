@@ -2,6 +2,7 @@
 import { Logo } from "./Logo";
 import { LocaleLink as Link } from "@/components/LocaleLink";
 import { useT } from "./LangProvider";
+import { useNavMenu, useMenuLabel } from "./NavMenuProvider";
 
 // Inline icons (no extra deps).
 const IgIcon = (p: any) => (
@@ -38,6 +39,8 @@ const SOCIAL: [string, string, (p: any) => JSX.Element][] = [];
 
 export function Footer() {
   const t = useT();
+  const navLinks = useNavMenu();
+  const labelOf = useMenuLabel();
   return (
     <footer className="relative z-10 mx-3 mb-3 overflow-hidden rounded-[1.75rem] border border-line bg-white px-6 pt-10 sm:pt-12 pb-7 text-ink shadow-[0_24px_60px_-40px_rgba(211,90,76,.35)] sm:mx-4 sm:rounded-[2.25rem] sm:px-10 lg:mx-5">
       {/* faint warm corner bloom */}
@@ -61,9 +64,9 @@ export function Footer() {
           {/* 2. Links */}
           <FootCol title={t("foot.links")} links={[["/", t("foot.home")], ["/shop", t("bc.shop")], ["/cart", t("foot.myCart")], ["/account", t("foot.account")]]}/>
 
-          {/* 3. Categories — only ones the store actually carries */}
-          {/* Same four categories as the header, so the whole site agrees. */}
-          <FootCol title={t("foot.categories")} links={[["/shop?gender=men", t("nav.men")], ["/shop?gender=women", t("nav.women")], ["/shop?sort=new", t("nav.new")], ["/shop?gender=gift", t("gender.gift")]]}/>
+          {/* 3. Categories — the same owner-editable menu as the header, so the
+              whole site agrees whenever a category is added or renamed. */}
+          <FootCol title={t("foot.categories")} links={navLinks.map(m => [m.href, labelOf(m)] as [string, string])}/>
 
           {/* 4. Contact */}
           <div className="col-span-2 md:col-span-1">

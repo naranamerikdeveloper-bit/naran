@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePermissions } from "../../lib/perms";
 import { AccessDenied } from "../../lib/AccessDenied";
 import { PageHeader } from "../../lib/ui";
+import { NavEditor } from "../../lib/NavEditor";
 
 type Bi = { mn: string; en: string };
 type Slide = { kicker: Bi; top: Bi; accent: Bi; desc: Bi; img: string; href: string };
@@ -146,7 +147,7 @@ const ContentPage = () => {
     <Container className="divide-y p-0">
       <PageHeader
         title="Контент — Нүүр хуудас"
-        description="Hero слайд ба урамшууллын баннерыг MN/EN-ээр удирдана."
+        description="Hero слайд, урамшууллын баннер, сайтын цэсийг MN/EN-ээр удирдана."
         actions={<Button variant="primary" onClick={save} isLoading={saving}>Хадгалах</Button>}
       />
 
@@ -206,6 +207,12 @@ const ContentPage = () => {
             <Input value={content.promo.href} onChange={(e) => setContent((c) => c && ({ ...c, promo: { ...c.promo, href: e.target.value } }))} placeholder="/shop?filter=sale" />
           </div>
         </div>
+      </div>
+
+      {/* Navbar — owner-editable menu items. Saves separately: the menu lives
+          under its own store-metadata key, not inside the homepage content. */}
+      <div className="px-6 py-4">
+        <NavEditor />
       </div>
 
       <div className="px-6 py-4">

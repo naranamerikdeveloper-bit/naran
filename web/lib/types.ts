@@ -38,6 +38,10 @@ export type Product = {
   // Set from metadata.gender (Men|Women|Unisex) when present — powers the
   // "хэрэглэгч" filter. Undefined = untagged (not counted).
   genderTag?: "Men" | "Women" | "Unisex";
+  // Every Medusa product-category handle this product belongs to. `category`
+  // above is the legacy five-key taxonomy; these are the raw handles, so an
+  // owner-created category (a navbar item they added) can be filtered on too.
+  categoryHandles?: string[];
   createdAt?: string;
 };
 

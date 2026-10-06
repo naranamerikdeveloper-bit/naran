@@ -9,8 +9,11 @@ import { QuickViewModal } from "@/components/QuickViewModal";
 import { FlyLayer } from "@/components/FlyLayer";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import { LangProvider } from "@/components/LangProvider";
+import { NavMenuProvider } from "@/components/NavMenuProvider";
+import { toMenu } from "@/lib/nav-menu";
 import { Consent } from "@/components/Consent";
 import { LOCALES, isLang, tFor } from "@/lib/i18n";
+import { medusa } from "@/lib/medusa";
 
 // Per-locale defaults (pages override title/description as needed).
 const META = {
@@ -55,23 +58,29 @@ const onest = Onest({ subsets: ["cyrillic", "cyrillic-ext"], weight: ["600", "70
 const inter = Inter({ subsets: ["latin", "cyrillic", "cyrillic-ext"], weight: ["400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-jetbrains", display: "swap", preload: false });
 
-export default function LangLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
+export default async function LangLayout({ children, params }: { children: React.ReactNode; params: { lang: string } }) {
   if (!isLang(params.lang)) notFound();
   const lang = params.lang;
   const t = tFor(lang);
+  // Owner-editable header/footer menu. Fetched once per locale here (ISR-cached
+  // under the "cms" tag, purged when the admin saves) so every page's Nav gets
+  // it without its own request; null → the built-in four categories.
+  const menu = toMenu(await medusa.navMenu());
   return (
     <html lang={lang} className={`${outfit.variable} ${onest.variable} ${inter.variable} ${mono.variable}`}>
       <body className="font-sans pb-24 lg:pb-0">
         <a href="#main" className="skip-link">{t("a11y.skip")}</a>
         <LangProvider lang={lang}>
-          <SmoothScroll />
-          <main id="main">{children}</main>
-          <Toast />
-          <CartDrawer />
-          <QuickViewModal />
-          <FlyLayer />
-          <MobileTabBar />
-          <Consent />
+          <NavMenuProvider menu={menu}>
+            <SmoothScroll />
+            <main id="main">{children}</main>
+            <Toast />
+            <CartDrawer />
+            <QuickViewModal />
+            <FlyLayer />
+            <MobileTabBar />
+            <Consent />
+          </NavMenuProvider>
         </LangProvider>
       </body>
     </html>
