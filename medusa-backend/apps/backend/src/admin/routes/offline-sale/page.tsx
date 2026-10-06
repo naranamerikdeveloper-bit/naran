@@ -55,8 +55,12 @@ const PAYMENTS: { value: string; label: string }[] = [
   { value: "transfer", label: "Шилжүүлэг" },
 ];
 
-// Exactly the storefront's nav categories, so the shop floor and the website
-// speak the same language (Эрэгтэй · Эмэгтэй · Шинэ ирсэн · Бэлгийн багц).
+// Two independent dimensions, same as the shop floor thinks:
+//  · the category row (below) — the store's real product categories, read off
+//    the catalogue itself so a category the owner adds in the admin shows up
+//    here with no code change;
+//  · the audience row — exactly the storefront's nav filters, so the till and
+//    the website speak the same language.
 const FILTERS: { key: string; label: string; match: (p: Product) => boolean }[] = [
   { key: "all", label: "Бүгд", match: () => true },
   { key: "men", label: "Эрэгтэй", match: p => p.gender === "Men" },
@@ -64,6 +68,8 @@ const FILTERS: { key: string; label: string; match: (p: Product) => boolean }[] 
   { key: "new", label: "Шинэ ирсэн", match: p => !!p.isNew },
   { key: "gift", label: "Бэлгийн багц", match: p => !!p.isGift },
 ];
+
+const inCategory = (p: Product, handle: string) => !handle || (p.categories || []).some(c => c.handle === handle);
 
 const stockOf = (v: Variant) => (v.manage ? (v.stock ?? 0) : null);
 const isOut = (v: Variant) => v.manage && (v.stock ?? 0) <= 0;
@@ -77,6 +83,7 @@ const OfflineSalePage = () => {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
+  const [cat, setCat] = useState("");
   const [pick, setPick] = useState<Record<string, string>>({});
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -135,18 +142,45 @@ const OfflineSalePage = () => {
     return () => { stop = true; clearInterval(timer); };
   }, [qpay, qpayStatus]);
 
-  // Live count per storefront category, so the cards show real numbers.
+  // The store's real categories, straight off the catalogue — so one added in
+  // the admin appears at the till on the next load. Counted within the active
+  // audience so the numbers on screen match what a tap actually shows.
+  const cats = useMemo(() => {
+    const active = FILTERS.find(f => f.key === filter) || FILTERS[0];
+    const pool = products.filter(active.match);
+    const byHandle = new Map<string, { handle: string; name: string; n: number }>();
+    for (const p of pool) {
+      for (const c of p.categories || []) {
+        if (!c?.handle) continue;
+        const row = byHandle.get(c.handle) || { handle: c.handle, name: c.name || c.handle, n: 0 };
+        row.n++;
+        byHandle.set(c.handle, row);
+      }
+    }
+    const list = [...byHandle.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+    // Keep the selected category visible even when the audience filter empties
+    // it, otherwise the chip you are standing on disappears from under you.
+    if (cat && !list.some(c => c.handle === cat)) {
+      const known = products.flatMap(p => p.categories || []).find(c => c.handle === cat);
+      if (known) list.push({ handle: cat, name: known.name || cat, n: 0 });
+    }
+    return [{ handle: "", name: "Бүгд", n: pool.length }, ...list];
+  }, [products, filter, cat]);
+
+  // Audience counts, measured inside the chosen category for the same reason.
   const counts = useMemo(() => {
+    const pool = products.filter(p => inCategory(p, cat));
     const out: Record<string, number> = {};
-    for (const f of FILTERS) out[f.key] = products.filter(f.match).length;
+    for (const f of FILTERS) out[f.key] = pool.filter(f.match).length;
     return out;
-  }, [products]);
+  }, [products, cat]);
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const active = FILTERS.find(f => f.key === filter) || FILTERS[0];
     return products.filter(p => {
       if (!active.match(p)) return false;
+      if (!inCategory(p, cat)) return false;
       if (!needle) return true;
       return (
         p.title.toLowerCase().includes(needle) ||
@@ -154,7 +188,7 @@ const OfflineSalePage = () => {
         p.variants.some(v => (v.sku || "").toLowerCase().includes(needle))
       );
     });
-  }, [products, q, filter]);
+  }, [products, q, filter, cat]);
 
   if (!permLoading && !can("orders.write")) {
     return <AccessDenied title="Кассын систем (POS)" perm="orders.write" />;
@@ -324,10 +358,18 @@ const OfflineSalePage = () => {
       {/* ---------- Body ---------- */}
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          {/* Categories — identical to the storefront's nav */}
-          <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto px-5 pt-4 pb-3">
+          {/* Row 1 — the store's own categories (Үнэртэй ус, Арьс арчилгаа, …),
+              including any the owner adds later. */}
+          <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto px-5 pt-4 pb-2.5">
+            {cats.map(c => (
+              <CatCard key={c.handle || "all"} active={cat === c.handle} onClick={() => setCat(c.handle)} name={c.name} n={c.n} />
+            ))}
+          </div>
+
+          {/* Row 2 — audience, exactly the storefront's nav filters. */}
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-5 pb-3">
             {FILTERS.map(f => (
-              <CatCard key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} name={f.label} n={counts[f.key] ?? 0} />
+              <Pill key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} label={f.label} n={counts[f.key] ?? 0} />
             ))}
             <span className="ml-auto shrink-0 pl-3 text-[12px] tabular-nums text-ui-fg-muted">{visible.length} бараа</span>
           </div>
@@ -671,6 +713,21 @@ function CatCard({ name, n, active, onClick }: { name: string; n: number; active
         : { background: "#fff", borderColor: "rgba(0,0,0,.07)", color: "inherit" }}>
       <div className="text-[13.5px] font-semibold leading-none">{name}</div>
       <div className="mt-1.5 text-[11.5px] tabular-nums" style={{ opacity: active ? .85 : .55 }}>{n} бараа</div>
+    </button>
+  );
+}
+
+// Secondary filter chip — quieter than CatCard so the two rows read as a
+// hierarchy (category first, then audience) rather than competing.
+function Pill({ label, n, active, onClick }: { label: string; n: number; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="shrink-0 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition"
+      style={active
+        ? { background: BRAND.soft, borderColor: BRAND.accent, color: BRAND.deep }
+        : { background: "#fff", borderColor: "rgba(0,0,0,.07)", color: "inherit" }}>
+      {label}
+      <span className="ml-1.5 tabular-nums" style={{ opacity: .55 }}>{n}</span>
     </button>
   );
 }

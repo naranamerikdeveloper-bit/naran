@@ -44,29 +44,50 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       filters: { created_at: { $gte: start.toISOString(), $lt: end.toISOString() } } as any,
       pagination: { take: 1000, skip: 0, order: { created_at: "DESC" } },
     });
-    const sales = (data || []).filter((o: any) => o?.metadata?.offline).map((o: any) => ({
-      no: o.display_id ? `NT-${o.display_id}` : o.id,
-      at: o.created_at,
-      payment: String(o.metadata?.payment_method || "cash"),
-      customerName: o.metadata?.customer_name || null,
-      discount: Number(o.metadata?.discount || 0),
-      total: Number(o.total || 0),
-      items: (o.items || []).map((it: any) => ({
-        title: it.title, quantity: it.quantity,
-        unit_price: Number(it.unit_price || 0), amount: Number((it.total ?? it.unit_price * it.quantity) || 0),
-      })),
-    }));
+    const offline = (data || []).filter((o: any) => o?.metadata?.offline);
+    // Who rang each sale up. The ids on the orders are resolved to names in one
+    // lookup so the Z-report reads as staff names, not actor ids.
+    const names = new Map<string, string>();
+    const ids = [...new Set(offline.map((o: any) => String(o.metadata?.recorded_by || "")).filter(Boolean))];
+    if (ids.length) {
+      try {
+        const users: any[] = await req.scope.resolve(Modules.USER).listUsers({ id: ids } as any, { take: ids.length });
+        for (const u of users || []) {
+          names.set(u.id, [u.first_name, u.last_name].filter(Boolean).join(" ").trim() || u.email || u.id);
+        }
+      } catch { /* fall back to ids */ }
+    }
+    const sales = offline.map((o: any) => {
+      const by = String(o.metadata?.recorded_by || "");
+      return {
+        no: o.display_id ? `NT-${o.display_id}` : o.id,
+        at: o.created_at,
+        payment: String(o.metadata?.payment_method || "cash"),
+        customerName: o.metadata?.customer_name || null,
+        discount: Number(o.metadata?.discount || 0),
+        total: Number(o.total || 0),
+        cashierId: by || null,
+        cashier: by ? names.get(by) || by : "Тодорхойгүй",
+        items: (o.items || []).map((it: any) => ({
+          title: it.title, quantity: it.quantity,
+          unit_price: Number(it.unit_price || 0), amount: Number((it.total ?? it.unit_price * it.quantity) || 0),
+        })),
+      };
+    });
     const byMethod: Record<string, { count: number; total: number }> = {};
+    const byStaff: Record<string, { count: number; total: number }> = {};
     for (const sale of sales) {
       const m = byMethod[sale.payment] || { count: 0, total: 0 };
       m.count++; m.total += sale.total; byMethod[sale.payment] = m;
+      const s = byStaff[sale.cashier] || { count: 0, total: 0 };
+      s.count++; s.total += sale.total; byStaff[sale.cashier] = s;
     }
     res.json({
       report: {
         date: start.toISOString().slice(0, 10),
         count: sales.length,
         total: sales.reduce((a: number, s2: any) => a + s2.total, 0),
-        byMethod, sales,
+        byMethod, byStaff, sales,
       },
     });
     return;

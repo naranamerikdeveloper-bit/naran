@@ -575,6 +575,17 @@ export const medusa = {
   customers: {
     // Real order history for the logged-in customer.
     orders: async (token: string) => ({ data: await fetchOrders(token) }),
+    // The shopper's coupon wallet — discount codes the shop has granted them.
+    // Read-only; codes are issued from the admin, never claimed client-side.
+    coupons: async (token: string): Promise<WalletCoupon[]> => {
+      const res = await fetch(`${URL}/store/coupons/me`, {
+        headers: { ...H, authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Could not load coupons");
+      return (data.coupons || []) as WalletCoupon[];
+    },
     // Saved addresses (from the customer record).
     addresses: async (token: string) => {
       const res = await fetch(`${URL}/store/customers/me?fields=*addresses`, { headers: { ...H, authorization: `Bearer ${token}` }, cache: "no-store" });
@@ -771,3 +782,16 @@ export type HomepageCms = { hero: CmsSlide[]; promo: CmsPromo };
 // One storefront menu item. `i18nKey` is set on the four built-ins so they keep
 // being translated; owner-added items carry literal MN/EN labels instead.
 export type CmsNavItem = { id: string; label: CmsBi; href: string; i18nKey?: string; category_id?: string; enabled?: boolean };
+// A discount code the shop has granted to this shopper. `state` is decided
+// server-side (used / expired / promotion switched off) so the storefront never
+// offers a code that would be rejected at checkout.
+export type WalletCoupon = {
+  code: string;
+  note: string;
+  issued_at: string;
+  expires_at: string | null;
+  used_at: string | null;
+  type: "percentage" | "fixed" | null;
+  value: number | null;
+  state: "usable" | "used" | "expired" | "inactive";
+};

@@ -10,10 +10,11 @@ import naranLogo from "../../assets/naran-logo.png";
 
 type Sale = {
   no: string; at: string; payment: string; customerName: string | null;
-  discount: number; total: number;
+  discount: number; total: number; cashierId: string | null; cashier: string;
   items: { title: string; quantity: number; unit_price: number; amount: number }[];
 };
-type Report = { date: string; count: number; total: number; byMethod: Record<string, { count: number; total: number }>; sales: Sale[] };
+type Tally = Record<string, { count: number; total: number }>;
+type Report = { date: string; count: number; total: number; byMethod: Tally; byStaff: Tally; sales: Sale[] };
 
 const todayStr = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const time = (s: string) => new Date(s).toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" });
@@ -87,6 +88,32 @@ const DayReportPage = () => {
         </div>
       )}
 
+      {/* Who was on the till. Shift hand-over and cash-up read off this. */}
+      {report && Object.keys(report.byStaff || {}).length > 0 && (
+        <Panel title="Ажилтнаар">
+          <TableCard>
+            <Table>
+              <Table.Header><Table.Row>
+                <Table.HeaderCell>Ажилтан</Table.HeaderCell>
+                <Table.HeaderCell className="text-right">Зарлага</Table.HeaderCell>
+                <Table.HeaderCell className="text-right">Дүн</Table.HeaderCell>
+              </Table.Row></Table.Header>
+              <Table.Body>
+                {Object.entries(report.byStaff)
+                  .sort((a, b) => b[1].total - a[1].total)
+                  .map(([name, v]) => (
+                    <Table.Row key={name}>
+                      <Table.Cell className="font-medium">{name}</Table.Cell>
+                      <Table.Cell className="text-right tabular-nums">{v.count}</Table.Cell>
+                      <Table.Cell className="text-right tabular-nums font-medium">{tug(v.total)}</Table.Cell>
+                    </Table.Row>
+                  ))}
+              </Table.Body>
+            </Table>
+          </TableCard>
+        </Panel>
+      )}
+
       <Panel title="Борлуулалтууд">
         {loading ? (
           <Text className="px-4 py-6 text-ui-fg-subtle">Ачаалж байна…</Text>
@@ -100,6 +127,7 @@ const DayReportPage = () => {
                   <Table.HeaderCell>Дугаар</Table.HeaderCell>
                   <Table.HeaderCell>Цаг</Table.HeaderCell>
                   <Table.HeaderCell>Төлбөр</Table.HeaderCell>
+                  <Table.HeaderCell>Ажилтан</Table.HeaderCell>
                   <Table.HeaderCell>Харилцагч</Table.HeaderCell>
                   <Table.HeaderCell className="text-right">Дүн</Table.HeaderCell>
                   <Table.HeaderCell />
@@ -111,6 +139,7 @@ const DayReportPage = () => {
                     <Table.Cell className="font-medium">{s.no}</Table.Cell>
                     <Table.Cell>{time(s.at)}</Table.Cell>
                     <Table.Cell><Badge size="2xsmall">{PAY_LABEL[s.payment] || s.payment}</Badge></Table.Cell>
+                    <Table.Cell className="max-w-[160px] truncate">{s.cashier}</Table.Cell>
                     <Table.Cell className="max-w-[160px] truncate text-ui-fg-subtle">{s.customerName || "—"}</Table.Cell>
                     <Table.Cell className="text-right tabular-nums font-medium">{tug(s.total)}</Table.Cell>
                     <Table.Cell className="text-right">

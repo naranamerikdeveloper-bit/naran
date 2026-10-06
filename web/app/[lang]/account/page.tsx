@@ -13,14 +13,14 @@ import { Skeleton } from "@/components/Skeleton";
 import { CountUp } from "@/components/CountUp";
 import { api, money } from "@/lib/api";
 import type { Product } from "@/lib/types";
-import { medusa, type CustomerOrder } from "@/lib/medusa";
+import { medusa, type CustomerOrder, type WalletCoupon } from "@/lib/medusa";
 
 const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
 
-const TABS = ["Overview", "Orders", "Wishlist", "Addresses", "Settings"] as const;
+const TABS = ["Overview", "Orders", "Coupons", "Wishlist", "Addresses", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_KEY: Record<Tab, string> = {
-  Overview: "acc.overview", Orders: "acc.orders", Wishlist: "acc.wishlist",
+  Overview: "acc.overview", Orders: "acc.orders", Coupons: "acc.coupons", Wishlist: "acc.wishlist",
   Addresses: "acc.addresses", Settings: "acc.settings",
 };
 
@@ -42,6 +42,7 @@ export default function AccountPage() {
   const showToast = useToast(s => s.show);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<WalletCoupon[]>([]);
   const [tab, setTab] = useState<Tab>("Overview");
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -74,6 +75,7 @@ export default function AccountPage() {
     };
     api.customers.orders(token).then(r => setOrders(r.data)).catch(expired);
     api.customers.addresses(token).then(r => setAddresses(r.data)).catch(() => {});
+    medusa.customers.coupons(token).then(setCoupons).catch(() => {});
     medusa.byIds(useWish.getState().ids).then(setAllProducts).catch(() => {}).finally(() => setLoadingProducts(false));
   }, [hydrated, user, token, router]);
 
@@ -123,6 +125,20 @@ export default function AccountPage() {
   const totalSpent = orders.reduce((a, b) => a + b.total, 0);
   const primaryAddress = addresses[0];
   const wished = allProducts.filter(p => wishIds.includes(p.id));
+  // Usable coupons lead; spent/expired ones are kept as a quiet history rather
+  // than hidden, so a shopper can see a code really was used.
+  const usableCoupons = coupons.filter(c => c.state === "usable");
+  const spentCoupons = coupons.filter(c => c.state !== "usable");
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast(t("acc.couponCopied"));
+    } catch {
+      // Clipboard is blocked in some in-app browsers — the code is on screen.
+      showToast(code);
+    }
+  };
 
   return (
     <>
@@ -203,6 +219,20 @@ export default function AccountPage() {
                     <div><div className="font-semibold text-sm">QPay</div><div className="tiny">{t("acc.qpayNote")}</div></div>
                   </div>
                 </Card>
+                <Card title={t("acc.coupons")}>
+                  {usableCoupons.length === 0 ? (
+                    <div className="text-sm text-muted">{t("acc.noCoupons")}</div>
+                  ) : (
+                    <button onClick={() => setTab("Coupons")}
+                      className="flex w-full items-center justify-between rounded-xl bg-accent-soft px-4 py-3 text-left transition hover:brightness-[.98]">
+                      <span>
+                        <span className="font-display text-[22px] tracking-tight text-accent-deep num-tabular">{usableCoupons.length}</span>
+                        <span className="ml-2 text-sm text-muted">{t("acc.couponsReady")}</span>
+                      </span>
+                      <span className="font-mono text-[13px] tracking-[.08em] text-accent-deep">{usableCoupons[0].code}</span>
+                    </button>
+                  )}
+                </Card>
               </div>
             )}
 
@@ -216,6 +246,28 @@ export default function AccountPage() {
                   </div>
                 )}
               </Card>
+            )}
+
+            {tab === "Coupons" && (
+              usableCoupons.length + spentCoupons.length === 0 ? (
+                <Card><Empty msg={t("acc.noCoupons")} cta/></Card>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  {usableCoupons.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {usableCoupons.map(c => <CouponTicket key={c.code} c={c} lang={lang} t={t} onCopy={copyCode}/>)}
+                    </div>
+                  )}
+                  {spentCoupons.length > 0 && (
+                    <div>
+                      <div className="tiny mb-2 uppercase tracking-[.16em] text-subtle">{t("acc.couponsPast")}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {spentCoupons.map(c => <CouponTicket key={c.code} c={c} lang={lang} t={t} onCopy={copyCode}/>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
             )}
 
             {tab === "Wishlist" && (
@@ -296,6 +348,53 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+// A coupon the shop granted this shopper, drawn as a ticket: the saving is the
+// headline, the code is the thing they copy. Spent and expired ones stay
+// visible but drained of colour so the live ones read first.
+function CouponTicket({
+  c, lang, t, onCopy,
+}: { c: WalletCoupon; lang: string; t: (k: string) => string; onCopy: (code: string) => void }) {
+  const live = c.state === "usable";
+  const amount = c.type === "percentage" && c.value != null
+    ? `${c.value}%`
+    : c.value != null ? money(c.value) : "—";
+  const stateLabel = t(
+    c.state === "used" ? "acc.couponUsed"
+      : c.state === "expired" ? "acc.couponExpired"
+        : "acc.couponInactive",
+  );
+  const until = c.expires_at
+    ? new Date(c.expires_at).toLocaleDateString(lang === "en" ? "en-GB" : "mn-MN", { year: "numeric", month: "short", day: "numeric" })
+    : null;
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border p-5 ${live ? "bg-white border-line shadow-soft" : "bg-surface-2 border-line/70"}`}>
+      {/* The notch that makes it read as a torn-off ticket. */}
+      <span className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-2 border border-line" aria-hidden />
+      <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-2 border border-line" aria-hidden />
+      <div className="flex items-start justify-between gap-3">
+        <div className={`font-display text-[30px] leading-none tracking-tight ${live ? "text-accent-deep" : "text-subtle"}`}>{amount}</div>
+        {!live && <span className="tiny rounded-pill bg-white px-2.5 py-1 text-subtle border border-line">{stateLabel}</span>}
+      </div>
+      {c.note && <div className="mt-2 text-[13px] text-muted">{c.note}</div>}
+      <div className="mt-4 flex items-center gap-2">
+        <code className={`flex-1 rounded-xl border border-dashed px-3 py-2 font-mono text-[14px] tracking-[.08em] ${live ? "border-accent/40 bg-accent-soft text-ink" : "border-line text-subtle line-through"}`}>
+          {c.code}
+        </code>
+        {live && (
+          <button type="button" onClick={() => onCopy(c.code)} className="btn btn-outline btn-sm shrink-0">
+            {t("acc.couponCopy")}
+          </button>
+        )}
+      </div>
+      {until && (
+        <div className="tiny mt-2.5 text-subtle">
+          {live ? `${t("acc.couponUntil")} ${until}` : until}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="bg-white border border-line rounded-2xl p-5 shadow-soft">

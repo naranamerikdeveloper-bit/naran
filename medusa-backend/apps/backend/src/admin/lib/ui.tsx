@@ -39,8 +39,9 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 /** Responsive grid for StatCards. */
-export function StatGrid({ children, cols = 4 }: { children: ReactNode; cols?: 3 | 4 | 5 }) {
+export function StatGrid({ children, cols = 4 }: { children: ReactNode; cols?: 2 | 3 | 4 | 5 }) {
   const map: Record<number, string> = {
+    2: "sm:grid-cols-2",
     3: "sm:grid-cols-3",
     4: "sm:grid-cols-2 xl:grid-cols-4",
     5: "sm:grid-cols-3 xl:grid-cols-5",

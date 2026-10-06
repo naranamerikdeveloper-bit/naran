@@ -17,6 +17,16 @@ import { PageHeader, Panel, EmptyState } from "../../lib/ui";
  */
 
 type Promo = { id: string; code: string; automatic: boolean; status: string; type: string; value: number | null; currency: string | null; used: number };
+type CouponState = "usable" | "used" | "expired" | "inactive";
+type WalletCoupon = { code: string; note: string; state: CouponState; used_at: string | null; expires_at: string | null };
+type Wallet = { email: string; coupons: WalletCoupon[] };
+
+const STATE_LABEL: Record<CouponState, string> = {
+  usable: "Ашиглах боломжтой", used: "Ашигласан", expired: "Хугацаа дууссан", inactive: "Идэвхгүй",
+};
+const STATE_COLOR: Record<CouponState, "green" | "grey" | "orange" | "red"> = {
+  usable: "green", used: "grey", expired: "orange", inactive: "red",
+};
 
 const CURRENCY = "mnt";
 const nf = (n: number) => new Intl.NumberFormat("mn-MN").format(n || 0);
@@ -43,6 +53,12 @@ const DiscountsPage = () => {
   const { loading: permLoading, can } = usePermissions();
   const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
+  // Grant-to-customer panel
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantCode, setGrantCode] = useState("");
+  const [grantNote, setGrantNote] = useState("");
+  const [granting, setGranting] = useState(false);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
   const [busy, setBusy] = useState(false);
 
   // New-code form
@@ -119,6 +135,38 @@ const DiscountsPage = () => {
       toast.error(e.message || "Код үүсгэж чадсангүй");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const lookupWallet = async () => {
+    const email = grantEmail.trim().toLowerCase();
+    if (!email) return;
+    try {
+      const j = await adminFetch(`/marketing/coupons?email=${encodeURIComponent(email)}`);
+      setWallet({ email: j.customer.email, coupons: j.coupons || [] });
+    } catch (e: any) {
+      setWallet(null);
+      toast.error(e.message || "Хэтэвч ачаалж чадсангүй");
+    }
+  };
+
+  const grant = async (action: "grant" | "revoke", code?: string) => {
+    const email = grantEmail.trim().toLowerCase();
+    const c = code || grantCode;
+    if (!email || !c) return;
+    setGranting(true);
+    try {
+      const j = await adminFetch("/marketing/coupons", {
+        method: "POST",
+        body: JSON.stringify({ email, code: c, note: grantNote.trim(), action }),
+      });
+      setWallet({ email: j.customer.email, coupons: j.coupons || [] });
+      toast.success(action === "revoke" ? `${c} хураалаа` : `${c} кодыг ${email} хаягт олголоо`);
+      if (action === "grant") setGrantNote("");
+    } catch (e: any) {
+      toast.error(e.message || "Амжилтгүй");
+    } finally {
+      setGranting(false);
     }
   };
 
@@ -245,6 +293,71 @@ const DiscountsPage = () => {
             </Table.Body>
           </Table>
         )}
+      </Panel>
+
+      {/* Hand a code to a named shopper. It then shows in their profile under
+          "Купон" — they do not have to remember or be told it. */}
+      <Panel title="Хэрэглэгчид код олгох">
+        <div className="flex flex-col gap-3 p-4">
+          <Text size="xsmall" className="text-ui-fg-subtle">
+            Бүртгэлтэй хэрэглэгчийн и-мэйлээр хайж, дээрх кодуудын аль нэгийг олгоно. Олгосон код тухайн хүний
+            «Миний булан → Купон» хэсэгт гарч, худалдан авалт хийхдээ шууд ашиглана.
+          </Text>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <Label size="small">Хэрэглэгчийн и-мэйл</Label>
+              <Input value={grantEmail} onChange={e => setGrantEmail(e.target.value)} placeholder="hereglegch@mail.com" className="w-[240px]" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label size="small">Код</Label>
+              <Select size="small" value={grantCode} onValueChange={setGrantCode}>
+                <Select.Trigger className="w-[200px]"><Select.Value placeholder="Код сонгох" /></Select.Trigger>
+                <Select.Content>
+                  {promos.map(p => <Select.Item key={p.id} value={p.code}>{p.code}</Select.Item>)}
+                </Select.Content>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label size="small">Тэмдэглэл (сонголттой)</Label>
+              <Input value={grantNote} onChange={e => setGrantNote(e.target.value)} placeholder="Шинэ хэрэглэгчийн бэлэг" className="w-[240px]" />
+            </div>
+            <Button variant="primary" size="small" isLoading={granting} disabled={!grantEmail.trim() || !grantCode}
+              onClick={() => grant("grant")}>Олгох</Button>
+            <Button variant="secondary" size="small" disabled={!grantEmail.trim()} onClick={lookupWallet}>Хэтэвч харах</Button>
+          </div>
+
+          {wallet && (
+            <div className="rounded-lg border border-ui-border-base">
+              <div className="border-b border-ui-border-base px-3 py-2">
+                <Text size="small" weight="plus">{wallet.email}</Text>
+              </div>
+              {wallet.coupons.length === 0 ? (
+                <Text size="small" className="px-3 py-3 text-ui-fg-subtle">Олгосон код алга.</Text>
+              ) : (
+                <Table>
+                  <Table.Header><Table.Row>
+                    <Table.HeaderCell>Код</Table.HeaderCell>
+                    <Table.HeaderCell>Төлөв</Table.HeaderCell>
+                    <Table.HeaderCell>Тэмдэглэл</Table.HeaderCell>
+                    <Table.HeaderCell />
+                  </Table.Row></Table.Header>
+                  <Table.Body>
+                    {wallet.coupons.map(c => (
+                      <Table.Row key={c.code}>
+                        <Table.Cell><span className="font-mono font-medium">{c.code}</span></Table.Cell>
+                        <Table.Cell><Badge size="2xsmall" color={STATE_COLOR[c.state]}>{STATE_LABEL[c.state]}</Badge></Table.Cell>
+                        <Table.Cell className="text-ui-fg-subtle">{c.note || "—"}</Table.Cell>
+                        <Table.Cell className="text-right">
+                          <Button variant="transparent" size="small" onClick={() => grant("revoke", c.code)}>Хураах</Button>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table>
+              )}
+            </div>
+          )}
+        </div>
       </Panel>
     </Container>
   );

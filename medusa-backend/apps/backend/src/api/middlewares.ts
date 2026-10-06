@@ -108,6 +108,17 @@ const guardStoreMetadata = (req: MedusaRequest, res: MedusaResponse, next: Medus
   next();
 };
 
+// Core POST /store/customers/me accepts arbitrary metadata, and the shopper's
+// coupon wallet lives in customer.metadata.naran_coupons — so a shopper could
+// otherwise mint themselves any discount code, or wipe the flag set by a
+// deletion request. Profile edits (name, phone, company) stay open; metadata is
+// shop-owned and is simply dropped.
+const dropCustomerMetadata = (req: MedusaRequest, _res: MedusaResponse, next: MedusaNextFunction) => {
+  const body = req.body as any;
+  if (body && typeof body === "object" && "metadata" in body) delete body.metadata;
+  next();
+};
+
 export default defineMiddlewares({
   routes: [
     // --- Auth rate limiting (login / register / password reset), both actor types ---
@@ -134,6 +145,9 @@ export default defineMiddlewares({
     // Cashiers must be able to check a discount code at the till, so this one
     // POST is gated on the POS permission rather than promotions.write.
     { matcher: "/admin/marketing/validate-code", methods: ["POST"], middlewares: [requirePermission("orders.write")] },
+    // Granting a code to a named customer is a marketing action, so it sits
+    // under /admin/marketing (a marketer has no customer permissions).
+    { matcher: "/admin/marketing/coupons", methods: ["POST"], middlewares: [requirePermission("promotions.write")] },
     // Core promotion CRUD (the discount-code screen writes through it).
     { matcher: "/admin/promotions", methods: ["POST"], middlewares: [requirePermission("promotions.write")] },
     { matcher: "/admin/promotions/:id", methods: ["POST", "DELETE"], middlewares: [requirePermission("promotions.write")] },
@@ -172,5 +186,6 @@ export default defineMiddlewares({
 
     // --- Payment safety: carts become orders only via the payments gateway ---
     { matcher: "/store/carts/:id/complete", methods: ["POST"], middlewares: [internalOnly] },
+    { matcher: "/store/customers/me", methods: ["POST"], middlewares: [dropCustomerMetadata] },
   ],
 });
