@@ -110,11 +110,20 @@ export default function AuthPage() {
       // Google-created accounts have no password: guide the shopper to the
       // Google button instead of a raw Medusa error.
       let msg = raw || t("toast.authFailed");
-      if (/already has an account|already exists/i.test(raw)) {
+      if (raw === "ACCOUNT_LINKED_ELSEWHERE") {
+        // The email belongs to an account created another way (Google).
+        msg = t("auth.linkedToGoogle");
+      } else if (isReg && /already has an account|already exists/i.test(raw)) {
+        // Only ever a signup problem — showing it while signing in told people
+        // their own account was "already registered" with no way forward.
         msg = t("auth.emailTaken");
         setMode("login");
       } else if (!isReg && /unauthor|invalid|401|credential/i.test(raw)) {
         msg = t("auth.loginFailed");
+      } else if (/could not load account|could not register|failed to fetch|networkerror|auth 5\d\d/i.test(raw)) {
+        // Don't blame the password for a backend hiccup — they would go and
+        // reset a password that was never wrong.
+        msg = t("auth.serviceDown");
       }
       showToast(msg);
       setFormError(msg);

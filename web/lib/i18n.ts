@@ -95,6 +95,8 @@ const en: Dict = {
   "auth.or": "or", "auth.haveAccount": "Already have an account?", "auth.noAccount": "New to NARAN?",
   "auth.google": "Continue with Google", "auth.googleUnavailable": "Google sign-in isn't available right now.", "auth.welcome": "Welcome!",
   "auth.emailTaken": "This email is already registered. Please sign in — or use “Continue with Google”.", "auth.loginFailed": "Wrong email or password. If you signed up with Google, use “Continue with Google” below.",
+  "auth.linkedToGoogle": "This email is registered with Google sign-in. Use “Continue with Google” below, or reset your password to add one.",
+  "auth.serviceDown": "We could not reach the server. Please try again in a moment.",
   "auth.googleFinishing": "Finishing Google sign-in…", "auth.googleFailed": "Google sign-in failed", "auth.googleFailedHint": "Please try again, or sign in with your email.",
   // account
   "acc.coupons": "Coupons", "acc.couponsReady": "ready to use", "acc.couponsPast": "Used and expired",
@@ -295,6 +297,8 @@ const mn: Dict = {
   "auth.or": "эсвэл", "auth.haveAccount": "Бүртгэлтэй юу?", "auth.noAccount": "NARAN-д шинэ юу?",
   "auth.google": "Google-ээр нэвтрэх", "auth.googleUnavailable": "Google нэвтрэлт одоогоор боломжгүй байна.", "auth.welcome": "Тавтай морил!",
   "auth.emailTaken": "Энэ имэйл бүртгэлтэй байна. Нэвтэрнэ үү — эсвэл доорх “Google-ээр нэвтрэх”-ийг ашиглана уу.", "auth.loginFailed": "Имэйл эсвэл нууц үг буруу байна. Google-ээр бүртгүүлсэн бол доорх “Google-ээр нэвтрэх”-ийг ашиглана уу.",
+  "auth.linkedToGoogle": "Энэ хаяг Google-ээр бүртгэгдсэн байна. Доорх «Google-ээр нэвтрэх»-ийг ашиглана уу, эсвэл «Нууц үг мартсан уу?»-гаар нууц үг үүсгээрэй.",
+  "auth.serviceDown": "Сервертэй холбогдож чадсангүй. Түр хүлээгээд дахин оролдоно уу.",
   "auth.googleFinishing": "Google нэвтрэлтийг дуусгаж байна…", "auth.googleFailed": "Google нэвтрэлт амжилтгүй боллоо", "auth.googleFailedHint": "Дахин оролдоно уу, эсвэл имэйлээрээ нэвтэрнэ үү.",
   "acc.coupons": "Купон", "acc.couponsReady": "код ашиглах боломжтой", "acc.couponsPast": "Ашигласан ба хугацаа дууссан",
   "acc.noCoupons": "Купон алга. Танд олгосон хөнгөлөлтийн кодууд энд харагдана.",

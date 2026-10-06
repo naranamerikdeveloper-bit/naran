@@ -484,11 +484,31 @@ export const medusa = {
       if (!token) throw new Error("Invalid credentials");
       try {
         return { token, user: await fetchMe(token) };
-      } catch {
-        // Login identity exists but its customer record was never created (a
-        // signup that failed half-way). Create it now instead of leaving the
-        // account unusable, then log in again for a customer-bound token.
-        await createCustomer(token, { email, firstName: email.split("@")[0], lastName: "" });
+      } catch (e) {
+        // Three very different failures used to land here and all got the same
+        // "create the customer" treatment, which locked people out of their own
+        // account with a *signup* error. Tell them apart by the token: Medusa
+        // sets actor_id only once the login identity is bound to a customer.
+        const boundTo = decodeJwt(token)?.actor_id;
+        if (boundTo) {
+          // The account exists and this token can read it — /customers/me just
+          // failed (a blip, a cold backend). Retry once, then report it as what
+          // it is rather than trying to register anything.
+          await new Promise(r => setTimeout(r, 400));
+          return { token, user: await fetchMe(token) };
+        }
+        // Unbound identity: a signup that failed half-way. Finish it.
+        try {
+          await createCustomer(token, { email, firstName: email.split("@")[0], lastName: "" });
+        } catch (ce: any) {
+          if (/already has an account|already exists/i.test(String(ce?.message || ""))) {
+            // A customer with this email exists but belongs to a different
+            // login (almost always Google). We cannot link them from the
+            // storefront — send them to the button that does work.
+            throw new Error("ACCOUNT_LINKED_ELSEWHERE");
+          }
+          throw ce;
+        }
         const again = await authPost("/auth/customer/emailpass", { email, password });
         return { token: again.token, user: await fetchMe(again.token) };
       }
