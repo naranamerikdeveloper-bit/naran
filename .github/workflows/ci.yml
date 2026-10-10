@@ -41,15 +41,15 @@ jobs:
       run:
         working-directory: medusa-backend/apps/backend
     services:
-      # Matches medusa-backend/apps/backend/.env.test (localhost:5433, vexo/vexo).
+      # Matches medusa-backend/apps/backend/.env.test (localhost:5433, naran/naran).
       # Port mapped to 5433 so the same test env works locally and in CI. The
       # POSTGRES_USER is a superuser, so pg-god can create per-run test DBs.
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: vexo
-          POSTGRES_PASSWORD: vexo
-          POSTGRES_DB: vexo_store
+          POSTGRES_USER: naran
+          POSTGRES_PASSWORD: naran
+          POSTGRES_DB: naran_store
         ports:
           - 5433:5432
         options: >-

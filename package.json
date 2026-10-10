@@ -1,5 +1,5 @@
 {
-  "name": "nitec",
+  "name": "naran",
   "version": "1.0.0",
   "private": true,
   "workspaces": [
@@ -18,5 +18,6 @@
   "devDependencies": {
     "concurrently": "^9.1.0",
     "kill-port": "^2.0.1"
-  }
+  },
+  "description": "Наран Америк Бараа — цахим дэлгүүр, админ, кассын систем"
 }

@@ -4,10 +4,7 @@ import * as Sentry from "@sentry/node";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import productsRouter from "./routes/products.js";
-import authRouter from "./routes/auth.js";
 import paymentsRouter, { botxonWebhook } from "./routes/payments.js";
-import { rateLimit } from "./lib/rate-limit.js";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 
@@ -40,19 +37,11 @@ app.post("/api/webhooks/botxon", express.raw({ type: "*/*" }), botxonWebhook);
 
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "nitec-api" }));
-app.use("/api/products", productsRouter);
-// Legacy in-memory /api/auth is only used by the storefront fallback
-// (NEXT_PUBLIC_USE_MEDUSA=0); production authenticates through Medusa, so this
-// dormant, non-persistent endpoint is dead surface in prod. Mount it only in dev
-// (or when explicitly re-enabled) to shrink the attack surface. Rate-limited (H9).
-if (!IS_PROD || process.env.ENABLE_LEGACY_AUTH === "1") {
-  app.use("/api/auth", rateLimit({ name: "api-auth", windowMs: 15 * 60_000, max: 20 }), authRouter);
-} else {
-  console.log("[api] legacy /api/auth disabled in production (set ENABLE_LEGACY_AUTH=1 to re-enable)");
-}
-// Legacy in-memory /api/orders removed (H10): it was unauthenticated (leaked all
-// orders / any order by email) and unused — real orders live in Medusa.
+app.get("/health", (_req, res) => res.json({ ok: true, service: "naran-api" }));
+// This service is the payment gateway and nothing else. The in-memory
+// /api/products, /api/auth and /api/orders it used to carry were leftovers from
+// the pre-Medusa prototype: the catalogue, customers and orders all live in
+// Medusa, and the storefront has not called them for a long time.
 // NOTE: payment-intent CREATION is rate-limited inside the router (POST /intent);
 // the status poll (GET /intent) is intentionally not, since the processing page
 // polls it frequently while waiting for payment.

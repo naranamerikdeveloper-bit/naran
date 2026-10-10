@@ -1,5 +1,5 @@
 import type { Category, FacetCount, ListResult, Product, User } from "./types";
-import { ENRICH, DEFAULT_ENRICH } from "./enrich";
+import { DEFAULTS } from "./enrich";
 import { TYPE_LABEL } from "./catalog";
 
 // Medusa category handle → storefront Category key. Taxonomy lives in Medusa
@@ -133,11 +133,6 @@ async function fetchOrders(token: string): Promise<CustomerOrder[]> {
 
 function map(m: any): Product {
   const handle = m.handle as string;
-  // ENRICH only knows the original demo handles; the real catalog comes from
-  // Medusa metadata. Never fall back to DEFAULT_ENRICH's placeholder rating /
-  // review count for real products — that would show shoppers invented reviews.
-  const known = !!ENRICH[handle];
-  const e = ENRICH[handle] || DEFAULT_ENRICH;
   const meta = (m.metadata || {}) as Record<string, any>;
   const brand: string | undefined = meta.brand || m.subtitle || undefined;
   const fragranceType: string | undefined = meta.fragrance_type || undefined;
@@ -147,7 +142,7 @@ function map(m: any): Product {
     .map((c: any) => c?.handle)
     .filter((h: any): h is string => typeof h === "string" && !!h);
   const catHandle = categoryHandles[0];
-  const category: Category = (catHandle && HANDLE_TO_CATEGORY[catHandle]) || e.category;
+  const category: Category = (catHandle && HANDLE_TO_CATEGORY[catHandle]) || DEFAULTS.category;
   const prices = (m.variants || [])
     .map((v: any) => v?.calculated_price?.calculated_amount)
     .filter((n: any) => typeof n === "number");
@@ -194,23 +189,22 @@ function map(m: any): Product {
     slug: handle,
     name: m.title,
     category,
-    shape: known ? e.shape : (category === "Gift" ? "giftset" : category === "Body" ? "lotion" : "perfume"),
-    gender: e.gender,
+    shape: category === "Gift" ? "giftset" : category === "Body" ? "lotion" : DEFAULTS.shape,
+    gender: DEFAULTS.gender,
     // Real gender tag from metadata (Men|Women|Unisex); undefined when untagged.
     genderTag: (["Men", "Women", "Unisex"] as const).find(g => g === meta.gender),
-    season: e.season,
+    season: DEFAULTS.season,
     price,
-    was: known && e.wasMultiplier ? Math.round(price * e.wasMultiplier) : undefined,
-    rating: known ? e.rating : 0,
-    reviews: known ? e.reviews : 0,
-    badge: meta.badge === "New" ? "New" : known ? (e.badge ?? null) : null,
-    colors: [e.accent],
+    rating: 0,
+    reviews: 0,
+    badge: meta.badge === "New" ? "New" : null,
+    colors: [DEFAULTS.accent],
     sizes,
-    fabric: (fragranceType && TYPE_LABEL[fragranceType]) || (known ? e.fabric : ""),
+    fabric: (fragranceType && TYPE_LABEL[fragranceType]) || "",
     shortDesc: description.slice(0, 90),
     description,
-    bullets: known ? e.bullets : [],
-    specs: known ? e.specs : Object.fromEntries(([
+    bullets: [],
+    specs: Object.fromEntries(([
       ["Брэнд", brand],
       ["Төрөл", fragranceType ? TYPE_LABEL[fragranceType] : undefined],
       ["Хэмжээ", sizes.length && sizes[0] !== "One size" ? sizes.join(" / ") : undefined],
@@ -220,7 +214,7 @@ function map(m: any): Product {
     categoryHandles,
     createdAt: m.created_at,
     stock,
-    accent: e.accent,
+    accent: DEFAULTS.accent,
     image: images[0],
     images,
     variants,

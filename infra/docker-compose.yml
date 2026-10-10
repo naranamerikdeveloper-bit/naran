@@ -1,30 +1,30 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: vexo-postgres
+    container_name: naran-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: vexo
-      POSTGRES_PASSWORD: vexo
-      POSTGRES_DB: vexo_store
+      POSTGRES_USER: naran
+      POSTGRES_PASSWORD: naran
+      POSTGRES_DB: naran_store
     ports:
       - "5433:5432"
     volumes:
-      - vexo_pgdata:/var/lib/postgresql/data
+      - naran_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vexo -d vexo_store"]
+      test: ["CMD-SHELL", "pg_isready -U naran -d naran_store"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: vexo-redis
+    container_name: naran-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
-      - vexo_redisdata:/data
+      - naran_redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -32,5 +32,5 @@ services:
       retries: 10
 
 volumes:
-  vexo_pgdata:
-  vexo_redisdata:
+  naran_pgdata:
+  naran_redisdata:

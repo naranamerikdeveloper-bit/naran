@@ -1,4 +1,4 @@
-# VEXO — Local dev (Docker-гүй хувилбар)
+# Наран — Local dev (Docker-гүй хувилбар)
 
 Энэ файл нь 2026-08-24-нд локал орчинг дахин ажиллуулах үед бичигдсэн.
 
@@ -23,15 +23,15 @@
 
 ```bash
 PG="/c/Program Files/PostgreSQL/18/bin"
-"$PG/initdb.exe" -D .localdb/pgdata -U vexo --auth-local=trust --auth-host=trust -E UTF8   # анх нэг удаа
+"$PG/initdb.exe" -D .localdb/pgdata -U naran --auth-local=trust --auth-host=trust -E UTF8   # анх нэг удаа
 "$PG/pg_ctl.exe" -D .localdb/pgdata -l .localdb/pg.log -o "-p 5433" start
-"$PG/createdb.exe" -h 127.0.0.1 -p 5433 -U vexo vexo_store                                  # анх нэг удаа
+"$PG/createdb.exe" -h 127.0.0.1 -p 5433 -U naran naran_store                                  # анх нэг удаа
 ```
 
 Зогсоох: `"$PG/pg_ctl.exe" -D .localdb/pgdata stop`
 
 `medusa-backend/apps/backend/.env` дэх `DATABASE_URL` нь аль хэдийн
-`postgres://vexo:vexo@127.0.0.1:5433/vexo_store` руу заасан (trust auth тул нууц үг хамаагүй).
+`postgres://naran:naran@127.0.0.1:5433/naran_store` руу заасан (trust auth тул нууц үг хамаагүй).
 
 ## 2. Medusa migration + seed
 
@@ -40,13 +40,13 @@ cd medusa-backend/apps/backend
 npx medusa db:migrate
 npx medusa exec ./src/scripts/seed-region.ts
 npx medusa exec ./src/scripts/seed-shipping.ts
-npx medusa exec ./src/scripts/seed-vexo.ts
+npx medusa exec ./src/scripts/seed-naran.ts
 npx medusa exec ./src/scripts/seed-inventory.ts
 npx medusa exec ./src/scripts/seed-mnt.ts
 npm run dev            # → http://localhost:9000
 ```
 
-Admin хэрэглэгч: `npx medusa user -e admin@vexo.gear -p <password>` → `http://localhost:9000/app`
+Admin хэрэглэгч: `npx medusa user -e admin@naranamerikbaraa.mn -p <password>` → `http://localhost:9000/app`
 
 ## 3. Storefront + payment API
 
@@ -66,7 +66,7 @@ NEXT_PUBLIC_MEDUSA_REGION = reg_… (Mongolia / MNT region)
 
 SQL-ээр шалгах:
 ```bash
-"$PG/psql.exe" -h 127.0.0.1 -p 5433 -U vexo -d vexo_store -c "select token from api_key; select id,name,currency_code from region;"
+"$PG/psql.exe" -h 127.0.0.1 -p 5433 -U naran -d naran_store -c "select token from api_key; select id,name,currency_code from region;"
 ```
 
 ## 5. Хайлт — MeiliSearch (сонголтоор, 10k+ каталогт)

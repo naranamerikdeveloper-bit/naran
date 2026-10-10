@@ -1,96 +1,76 @@
-# Nitec — Premium e‑commerce
+# Наран Америк Бараа
 
-Full-stack monorepo: **Next.js 14** frontend + **Express + Node.js** backend.
+АНУ, Канадаас ирсэн оригинал үнэртэй усны цахим дэлгүүр: үйлчлүүлэгчийн вэб, админ
+систем, дэлгүүр дээрх кассын (POS) систем — нэг монорепод.
 
-## Stack
+- Дэлгүүр: <https://naranamerikbaraa.mn>
+- Админ ба API: <https://api.naranamerikbaraa.mn> (админ нь `/app`)
 
-| Layer       | Tech                                                            |
-|-------------|-----------------------------------------------------------------|
-| Frontend    | Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion, Zustand |
-| Backend     | Node.js, Express, TypeScript, JWT (jsonwebtoken), bcryptjs, Zod  |
-| Tooling     | npm workspaces, tsx, concurrently                                |
+## Стек
 
-## Structure
+| Давхарга | Технологи |
+|---|---|
+| Дэлгүүрийн вэб | Next.js 14 (App Router), TypeScript, Tailwind, Framer Motion, Zustand |
+| Худалдааны цөм | Medusa v2 — бараа, захиалга, хэрэглэгч, нөөц, урамшуулал |
+| Админ ба POS | Medusa admin дээрх өөрийн хуудсууд (React + Vite + @medusajs/ui) |
+| Төлбөр | Express + Zod — Botxon/QPay нэхэмжлэх, баталгаажуулалт |
+| Өгөгдөл | PostgreSQL 16 · Redis 7 · MeiliSearch · Cloudflare R2 (зураг) |
+| Байршуулалт | Docker Compose · Dokploy · Traefik (Let's Encrypt) |
+
+## Бүтэц
 
 ```
 .
-├── package.json          ← workspace root (web + api)
-├── web/                  ← Next.js app
-│   ├── app/              ← App Router pages
-│   │   ├── page.tsx              (Homepage — bento hero)
-│   │   ├── shop/                 (Listing + filters)
-│   │   ├── product/[id]/         (Detail + tabs + AddToCart)
-│   │   ├── cart/                 (Persistent cart via Zustand)
-│   │   ├── checkout/             (Multi-step + order POST)
-│   │   ├── checkout/success/     (Confirmation)
-│   │   ├── account/              (Auth-gated dashboard)
-│   │   └── auth/                 (Login / register tabs)
-│   ├── components/       (Nav, Footer, ProductCard, Icons, Toast …)
-│   └── lib/              (api client, zustand stores, types)
-└── api/                  ← Express REST API
-    └── src/
-        ├── index.ts              (server entry)
-        ├── routes/
-        │   ├── products.ts
-        │   ├── auth.ts           (JWT + bcrypt)
-        │   └── orders.ts         (Zod validated)
-        └── data/products.ts      (in-memory catalog)
+├── web/                    Next.js дэлгүүр (MN/EN)
+│   ├── app/[lang]/         хуудсууд: нүүр, дэлгүүр, бараа, сагс, төлбөр, бүртгэл
+│   ├── components/         Nav, Footer, ProductCard, SearchBox, …
+│   └── lib/                medusa.ts (өгөгдлийн давхарга), store.ts (Zustand), i18n.ts
+│
+├── medusa-backend/apps/backend/
+│   ├── src/api/            admin/ ба store/ маршрутууд + middlewares.ts (эрхийн хяналт)
+│   ├── src/admin/routes/   өөрийн админ хуудсууд: POS, тайлан, хямдрал, контент, баг
+│   ├── src/lib/            catalog, reports, coupons, rbac, nav, cms, fulfillment …
+│   ├── src/subscribers/    и-мэйл, revalidate, эрх олголт, купон тэмдэглэх
+│   └── src/scripts/        анхны тохиргоо ба өгөгдөл оруулах скриптүүд
+│
+├── api/                    Express — зөвхөн төлбөрийн gateway (Botxon/QPay)
+└── infra/                  docker-compose (локал ба production)
 ```
 
-## Quick start
+## Локал орчинд ажиллуулах
+
+Дэлгэрэнгүй: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md).
 
 ```bash
-# 1. Install
 npm install
-
-# 2. Env (optional — sensible defaults already)
-cp api/.env.example api/.env
-cp web/.env.example web/.env.local
-
-# 3. Run both (API on :4000, Web on :3000)
-npm run dev
+npm run dev          # API :4000, вэб :3000
 ```
 
-Open <http://localhost:3000>.
+Medusa backend тусдаа асна (`medusa-backend/apps/backend` дотор `npm run dev` → :9000).
 
-Create an account on `/auth` (register), or use a Medusa customer you seeded locally. No shared demo credentials are committed.
+## Байршуулалт
 
-## API endpoints
+**Зөвхөн Dokploy-гийн Redeploy товчоор** байршуулна. Сервер дээр гараар
+`docker compose up -d --force-recreate` ажиллуулбал Traefik-ийн чиглүүлэлт
+устаж, домэйн 404 өгнө. Дэлгэрэнгүй ба сэргээх заавар:
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
-| Method | Path                    | Description                |
-|--------|-------------------------|----------------------------|
-| GET    | `/health`               | Health probe               |
-| GET    | `/api/products`         | List (`?category=&sort=&q=`) |
-| GET    | `/api/products/featured`| 6-product featured set     |
-| GET    | `/api/products/:idOrSlug` | Single + 3 related        |
-| POST   | `/api/auth/signup`      | Returns `{ token, user }`  |
-| POST   | `/api/auth/login`       | Returns `{ token, user }`  |
-| GET    | `/api/auth/me`          | `Authorization: Bearer …`  |
-| POST   | `/api/orders`           | Create order (Zod validated) |
-| GET    | `/api/orders/:id`       | Single order               |
-| GET    | `/api/orders?email=`    | List orders for email      |
+## Баримт бичиг
 
-Browser-side fetches go through Next.js `rewrites()` (no CORS issues), server-side fetches hit `API_URL` directly.
+| Файл | Юуны тухай |
+|---|---|
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Байршуулалт, орчны хувьсагч, гэмтэл засах |
+| [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) | Локал орчин бэлдэх |
+| [docs/NARAN-ADMIN-SPEC.md](docs/NARAN-ADMIN-SPEC.md) | Админ системийн шаардлага |
+| [docs/NARAN-BRD.md](docs/NARAN-BRD.md) | Бизнесийн шаардлага |
+| [docs/PRODUCTION-READINESS-AUDIT.md](docs/PRODUCTION-READINESS-AUDIT.md) | Аудит ба засварын түүх |
+| [SECURITY.md](SECURITY.md) | Аюулгүй байдлын зарчим, эмзэг асуудал мэдээлэх |
 
-## Production build
+## Хөгжүүлэхэд баримтлах зүйлс
 
-```bash
-npm run build     # builds both api/dist and web/.next
-npm start         # serves both, API :4000 + Web :3000
-```
-
-## Where to swap real services
-
-| Concern    | Demo                      | Production drop-in            |
-|------------|---------------------------|-------------------------------|
-| Database   | In-memory `Map`           | Prisma + Postgres (`api/src/db.ts`) |
-| Auth       | JWT in `localStorage`     | HttpOnly cookies + refresh   |
-| Payments   | Form-only checkout        | Stripe Elements / Checkout    |
-| Images     | Inline SVG illustrations  | Cloudinary + `next/image`     |
-| Search     | `?q=` substring match     | Meilisearch / Algolia         |
-
----
-
-## Legacy (no‑framework) version
-
-A vanilla HTML/CSS/JS version of the same store is still in the repo root (`index.html`, `shop.html`, …) — useful as a static reference, but the Next.js app is the canonical one.
+- **Мөнгийг зөвхөн сервер тооцно.** Үнэ, дүнг хөтчөөс ирсэн утгаар бүү итгэ —
+  POS ч, checkout ч серверээс дахин тооцдог.
+- **Medusa metadata-г солих нь нэгтгэхгүй, орлуулдаг.** Store болон customer
+  metadata бичихдээ үргэлж `lib/store-meta.ts` / `lib/customer-meta.ts`-ээр дамжуул,
+  эс бөгөөс өөр функцийн өгөгдлийг устгана.
+- **Шинэ админ маршрут бүрд эрхийн хамгаалалт** `src/api/middlewares.ts`-д нэмнэ.
