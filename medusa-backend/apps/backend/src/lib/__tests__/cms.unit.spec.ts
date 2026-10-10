@@ -21,7 +21,9 @@ describe("cms.sanitize", () => {
     expect(out.hero).toHaveLength(1);
     expect(out.hero[0].top).toEqual({ mn: "Гоо", en: "Beauty" });
     expect(out.hero[0].kicker).toEqual({ mn: "", en: "" }); // missing → empty
-    expect(out.hero[0].img).toBe("123"); // coerced to string
+    // Not an https URL or an in-site path, so it is dropped rather than
+    // rendered as a broken <img src="123">.
+    expect(out.hero[0].img).toBe("");
     expect(out.hero[0].href).toBe("/shop"); // default
   });
 

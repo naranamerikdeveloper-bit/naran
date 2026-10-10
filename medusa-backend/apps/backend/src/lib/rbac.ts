@@ -73,3 +73,46 @@ export function canActor(actor: { role?: string | null; email?: string | null },
   if (bootstrap.length === 0) return true; // not configured → no lockout
   return bootstrap.includes((actor.email || "").toLowerCase());
 }
+
+// --- Cashier lock -----------------------------------------------------------
+//
+// The permission map above governs the admin routes we wrote. Medusa's core
+// admin API (products, orders, promotions, users, inventory …) has no role
+// model of its own in v2, so a cashier holding a valid admin session could call
+// it directly and rewrite a price or read every customer — the custom pages
+// being hidden from them is UI, not a control.
+//
+// cashierMayCall is the rule that closes it. It applies to the cashier role and
+// to nobody else: every other role, including a user with no role at all, is
+// unaffected, so no existing admin can be locked out by it.
+
+// What the till actually uses.
+const CASHIER_ALLOW: { re: RegExp; methods: string[] }[] = [
+  // The POS screen (sell, take payment) and the day-close report.
+  { re: /^\/admin\/offline-sale(\/qpay)?$/, methods: ["GET", "POST"] },
+  // Checking a discount code at the till.
+  { re: /^\/admin\/marketing\/validate-code$/, methods: ["POST"] },
+  // The admin shell and usePermissions need to know who is signed in.
+  { re: /^\/admin\/users\/me$/, methods: ["GET"] },
+];
+
+// Reads a cashier has no business making even though the shell can reach them:
+// staff and invites, customers, money and reporting, the catalogue with its
+// costs, and the store's own configuration.
+const CASHIER_DENY_READ =
+  /^\/admin\/(users|invites|api-keys|customers|orders|draft-orders|products|product-categories|product-types|product-tags|collections|inventory-items|stock-locations|price-lists|pricing|promotions|campaigns|reports|analytics|audit|crm|team|stores|regions|returns|claims|exchanges|payments|refund-reasons|reservations|shipping-options|fulfillment-providers|notifications|workflows-executions|uploads)(\/|$)/;
+
+/**
+ * May a cashier make this admin request?
+ *
+ * Deny-by-default for anything that changes data. For reads, the sensitive
+ * areas are denied and the rest is allowed, so the Medusa admin shell still
+ * boots around the POS page.
+ */
+export function cashierMayCall(method: string, path: string): boolean {
+  const m = String(method || "GET").toUpperCase();
+  const p = String(path || "").split("?")[0];
+  if (CASHIER_ALLOW.some(a => a.methods.includes(m) && a.re.test(p))) return true;
+  if (m !== "GET") return false;
+  return !CASHIER_DENY_READ.test(p);
+}

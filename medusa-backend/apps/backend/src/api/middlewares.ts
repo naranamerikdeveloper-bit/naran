@@ -1,7 +1,7 @@
 import { defineMiddlewares, MedusaNextFunction, MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { Modules } from "@medusajs/framework/utils";
 import { createHash, timingSafeEqual } from "crypto";
-import { canActor, Permission } from "../lib/rbac";
+import { canActor, cashierMayCall, Permission } from "../lib/rbac";
 import { rateLimit } from "../lib/rate-limit";
 
 // Auth throttles (H9): brute-force / credential-stuffing on login, and spam on
@@ -40,6 +40,34 @@ function requirePermission(perm: Permission) {
       next(e as Error);
     }
   };
+}
+
+// POS-only lock for the cashier role. The rule itself lives in lib/rbac
+// (cashierMayCall) so it is unit-tested; this only resolves who is calling.
+//
+// It runs before every other admin guard because Medusa core admin routes have
+// no role model of their own. Any role other than cashier — including a user
+// with no role at all — passes straight through, so nobody can be locked out.
+async function cashierLock(req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) {
+  const userId = (req as any).auth_context?.actor_id;
+  if (!userId) return next(); // unauthenticated → core auth answers first
+
+  let role: unknown;
+  try {
+    const user: any = await req.scope
+      .resolve(Modules.USER)
+      .retrieveUser(userId, { select: ["id", "metadata"] as any });
+    role = user?.metadata?.role;
+  } catch {
+    return next(); // lookup failed → leave the decision to the route own guard
+  }
+  if (role !== "cashier") return next();
+
+  if (!cashierMayCall(req.method, String(req.originalUrl || req.url || ""))) {
+    res.status(403).json({ message: "Кассчин зөвхөн кассын системд хандах эрхтэй" });
+    return;
+  }
+  next();
 }
 
 // Cart completion is internal-only. The region's payment provider is the
@@ -125,6 +153,16 @@ export default defineMiddlewares({
     { matcher: "/auth/:actor/emailpass", methods: ["POST"], middlewares: [loginLimit] },
     { matcher: "/auth/:actor/emailpass/register", methods: ["POST"], middlewares: [registerLimit] },
     { matcher: "/auth/:actor/emailpass/reset-password", methods: ["POST"], middlewares: [resetLimit] },
+
+    // --- Cashier lock ---
+    // Runs before every other admin guard: the core Medusa admin API has no
+    // role model of its own, so this is what actually keeps a cashier inside
+    // the POS. No effect on any other role.
+    {
+      matcher: "/admin/*",
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      middlewares: [cashierLock],
+    },
 
     { matcher: "/admin/catalog/*", methods: ["GET"], middlewares: [requirePermission("catalog.read")] },
     // CSV import posts the whole file as JSON — the 100KB default rejects real catalogs.
