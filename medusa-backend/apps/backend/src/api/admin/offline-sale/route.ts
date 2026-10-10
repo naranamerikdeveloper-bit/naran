@@ -11,6 +11,61 @@ import { reserveOrderItems, fulfillOrder, shipOrder, deliverOrder } from "../../
 
 const CURRENCY = "mnt";
 
+// Product picker paging. DEFAULT_PAGE is what one screen of the POS grid shows
+// before "load more". The AUDIENCE_SCAN_* pair bounds the fallback that filters
+// product metadata in JS, used only if this Medusa version will not build the
+// JSONB query itself.
+const DEFAULT_PAGE = 60;
+const AUDIENCE_SCAN_PAGE = 500;
+const AUDIENCE_SCAN_MAX = 50_000;
+
+const POS_FIELDS = [
+  "id", "title", "subtitle", "thumbnail", "metadata",
+  "categories.id", "categories.name", "categories.handle",
+  "variants.id", "variants.title", "variants.sku", "variants.manage_inventory",
+  "variants.prices.amount", "variants.prices.currency_code",
+  "variants.inventory_items.inventory.location_levels.available_quantity",
+];
+
+// The storefront's audience filters, expressed as the product metadata they
+// read. Keeping them here means the till and the website agree on what
+// "Эрэгтэй" or "Шинэ ирсэн" means.
+const AUDIENCE_META: Record<string, Record<string, string>> = {
+  men: { gender: "Men" },
+  women: { gender: "Women" },
+  new: { badge: "New" },
+  gift: { fragrance_type: "Set" },
+};
+
+// One product as the POS grid needs it: a card, its variants, their prices and
+// what is left on the shelf.
+function toPosProduct(p: any) {
+  const meta = (p.metadata || {}) as Record<string, any>;
+  return {
+    id: p.id,
+    title: p.title,
+    thumbnail: p.thumbnail || "",
+    brand: meta.brand || p.subtitle || "",
+    gender: typeof meta.gender === "string" ? meta.gender : "",
+    isNew: meta.badge === "New",
+    isGift: meta.fragrance_type === "Set" || (p.categories || []).some((c: any) => c.handle === "gift"),
+    categories: (p.categories || []).map((c: any) => ({ id: c.id, name: c.name, handle: c.handle })),
+    variants: (p.variants || []).map((v: any) => {
+      const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);
+      const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
+      const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
+      return {
+        id: v.id,
+        title: v.title || p.title,
+        sku: v.sku || "",
+        price: mnt ? Number(mnt.amount) : 0,
+        manage: v.manage_inventory !== false,
+        stock: v.manage_inventory === false ? null : available,
+      };
+    }),
+  };
+}
+
 // GET /admin/offline-sale?q=  — product + variant picker (id, title, sku, MNT
 // price) for the in-person sale form. Published products only.
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
@@ -93,48 +148,129 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     return;
   }
 
-  const q = (req.query.q as string) || "";
-  const filters: any = { status: "published" };
-  if (q) filters.title = { $ilike: `%${q}%` };
+  // --- Product picker ------------------------------------------------------
+  //
+  // The grid used to pull the whole catalogue once (capped at 300) and filter
+  // it in the browser. That does not survive a 10,000-product shop: payload,
+  // memory and render time all grow with the catalogue. Search, category and
+  // paging now happen in the database, so the till behaves the same whether the
+  // shop carries 75 products or 50,000.
+  const q = String(req.query.q ?? "").trim();
+  const cat = String(req.query.cat ?? "").trim();
+  const aud = String(req.query.aud ?? "").trim();
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || DEFAULT_PAGE));
+  const offset = Math.max(0, Number(req.query.offset) || 0);
 
-  const { data } = await query.graph({
-    entity: "product",
-    fields: [
-      "id", "title", "subtitle", "thumbnail", "metadata",
-      "categories.id", "categories.name", "categories.handle",
-      "variants.id", "variants.title", "variants.sku", "variants.manage_inventory",
-      "variants.prices.amount", "variants.prices.currency_code",
-      "variants.inventory_items.inventory.location_levels.available_quantity",
-    ],
-    filters,
-    // The POS grid loads the catalog once and filters client-side (instant for a
-    // cashier), so take the whole published catalog rather than a search page.
-    pagination: { take: 300, skip: 0, order: { title: "ASC" } },
-  });
+  const base: any = { status: "published" };
+  if (cat) base.categories = { handle: cat };
+  if (q) base.title = { $ilike: `%${q}%` };
 
-  const products = (data || []).map((p: any) => {
-    const meta = (p.metadata || {}) as Record<string, any>;
-    return {
-      id: p.id,
-      title: p.title,
-      thumbnail: p.thumbnail || "",
-      brand: meta.brand || p.subtitle || "",
-      gender: typeof meta.gender === "string" ? meta.gender : "",
-      // Same signals the storefront uses for its "Шинэ ирсэн" / "Бэлгийн багц"
-      // nav, so the POS can offer exactly the same categories.
-      isNew: meta.badge === "New",
-      isGift: meta.fragrance_type === "Set" || (p.categories || []).some((c: any) => c.handle === "gift"),
-      categories: (p.categories || []).map((c: any) => ({ id: c.id, name: c.name, handle: c.handle })),
-      variants: (p.variants || []).map((v: any) => {
-        const mnt = (v.prices || []).find((pr: any) => pr.currency_code === CURRENCY);
-        const levels = (v.inventory_items || []).flatMap((ii: any) => ii?.inventory?.location_levels || []);
-        const available = levels.reduce((a: number, l: any) => a + Number(l?.available_quantity ?? 0), 0);
-        return { id: v.id, title: v.title || p.title, sku: v.sku || "", price: mnt ? Number(mnt.amount) : 0, manage: v.manage_inventory !== false, stock: v.manage_inventory === false ? null : available };
+  const page = (filters: any, take: number, skip: number) =>
+    query.graph({
+      entity: "product",
+      fields: POS_FIELDS,
+      filters,
+      pagination: { take, skip, order: { title: "ASC" } },
+    });
+
+  const audMeta = AUDIENCE_META[aud];
+  let rows: any[] = [];
+  let count = 0;
+
+  if (audMeta) {
+    // The audience chips key off product metadata (JSONB). Postgres can filter
+    // that, but rather than bet the till on this Medusa version building the
+    // query, a failure falls back to filtering a bounded page in JS.
+    let filtered = false;
+    try {
+      const r: any = await page({ ...base, metadata: audMeta }, limit, offset);
+      rows = r.data || [];
+      count = r.metadata?.count ?? rows.length;
+      filtered = true;
+    } catch {
+      filtered = false;
+    }
+    if (!filtered) {
+      // Page the whole catalogue rather than sampling the first N: a cap here
+      // would silently hide products from the till, which is worse than being
+      // slow on a path that should never run.
+      const [k, v] = Object.entries(audMeta)[0];
+      const all: any[] = [];
+      for (let skip = 0; skip < AUDIENCE_SCAN_MAX; skip += AUDIENCE_SCAN_PAGE) {
+        const r: any = await page(base, AUDIENCE_SCAN_PAGE, skip);
+        const batch: any[] = r.data || [];
+        for (const p of batch) if ((p.metadata || {})[k] === v) all.push(p);
+        if (batch.length < AUDIENCE_SCAN_PAGE) break;
+      }
+      count = all.length;
+      rows = all.slice(offset, offset + limit);
+    }
+  } else {
+    const r: any = await page(base, limit, offset);
+    rows = r.data || [];
+    count = r.metadata?.count ?? rows.length;
+  }
+
+  // A scanned barcode is an exact SKU, not a title fragment — look it up too so
+  // scanning finds the product even when its name shares nothing with the code.
+  if (q && offset === 0) {
+    try {
+      const r: any = await page({ status: "published", variants: { sku: q } }, 5, 0);
+      const have = new Set(rows.map((p: any) => p.id));
+      const extra = (r.data || []).filter((p: any) => !have.has(p.id));
+      if (extra.length) {
+        rows = [...extra, ...rows].slice(0, limit);
+        count += extra.length;
+      }
+    } catch { /* SKU lookup is a bonus; the title search already answered */ }
+  }
+
+  const products = rows.map(toPosProduct);
+
+  // The category row. Sent only when asked (once, on load): a count per
+  // category is one cheap COUNT each, and the cashier does not need them again
+  // on every keystroke. A cashier cannot call /admin/product-categories — the
+  // POS lock blocks it — so the list comes from here.
+  let categories: { handle: string; name: string; count: number }[] | undefined;
+  let allCount: number | undefined;
+  if (req.query.facets) {
+    try {
+      const productModule = req.scope.resolve(Modules.PRODUCT);
+      const [, total] = await productModule.listAndCountProducts(
+        { status: "published" } as any,
+        { take: 1, select: ["id"] as any },
+      );
+      allCount = total;
+    } catch { /* the "Бүгд" card simply shows nothing */ }
+  }
+  if (req.query.facets) {
+    const { data: cats } = await query.graph({
+      entity: "product_category",
+      fields: ["id", "name", "handle"],
+      pagination: { take: 100, skip: 0, order: { name: "ASC" } },
+    });
+    const productModule = req.scope.resolve(Modules.PRODUCT);
+    categories = await Promise.all(
+      (cats || []).map(async (c: any) => {
+        let n = 0;
+        try {
+          const [, total] = await productModule.listAndCountProducts(
+            { status: "published", categories: { id: c.id } } as any,
+            { take: 1, select: ["id"] as any },
+          );
+          n = total;
+        } catch { /* a count we cannot get is shown as zero, not an error */ }
+        return { handle: c.handle, name: c.name, count: n };
       }),
-    };
-  });
+    );
+    categories = categories.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
+  }
 
-  res.json({ products });
+  res.json({
+    products, count, limit, offset,
+    ...(categories ? { categories } : {}),
+    ...(allCount !== undefined ? { allCount } : {}),
+  });
 }
 
 // POST /admin/offline-sale — record an in-person / offline sale as a Medusa

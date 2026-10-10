@@ -69,7 +69,8 @@ const FILTERS: { key: string; label: string; match: (p: Product) => boolean }[] 
   { key: "gift", label: "Бэлгийн багц", match: p => !!p.isGift },
 ];
 
-const inCategory = (p: Product, handle: string) => !handle || (p.categories || []).some(c => c.handle === handle);
+
+const PAGE = 60;
 
 const stockOf = (v: Variant) => (v.manage ? (v.stock ?? 0) : null);
 const isOut = (v: Variant) => v.manage && (v.stock ?? 0) <= 0;
@@ -106,15 +107,48 @@ const OfflineSalePage = () => {
   const [qpayBusy, setQpayBusy] = useState(false);
   const [last, setLast] = useState<Receipt | null>(null);
   const [today, setToday] = useState<{ count: number; total: number } | null>(null);
+  // Server-side paging state: how many products match, and the category list
+  // the backend sends once (a cashier may not read /admin/product-categories).
+  const [matchCount, setMatchCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [catalogCats, setCatalogCats] = useState<{ handle: string; name: string; count: number }[] | null>(null);
+  const [allCount, setAllCount] = useState(0);
 
   const loadSummary = () => adminFetch("/offline-sale?summary=1").then(r => setToday(r.summary)).catch(() => {});
-  const loadProducts = () =>
-    adminFetch("/offline-sale")
-      .then(r => setProducts(r.products || []))
-      .catch(() => toast.error("Бараа ачаалж чадсангүй"))
-      .finally(() => setLoading(false));
 
-  useEffect(() => { loadSummary(); loadProducts(); }, []);
+  // Search, category and paging all happen in the database — the till must not
+  // hold the catalogue in memory, because the catalogue can be 10,000 products.
+  // `more` appends the next page; otherwise the grid is replaced.
+  const loadProducts = async (opts: { more?: boolean } = {}) => {
+    const skip = opts.more ? products.length : 0;
+    const p = new URLSearchParams({ limit: String(PAGE), offset: String(skip) });
+    if (q.trim()) p.set("q", q.trim());
+    if (cat) p.set("cat", cat);
+    if (filter !== "all") p.set("aud", filter);
+    if (!catalogCats) p.set("facets", "1");
+    opts.more ? setLoadingMore(true) : setLoading(true);
+    try {
+      const r = await adminFetch(`/offline-sale?${p.toString()}`);
+      setProducts(prev => (opts.more ? [...prev, ...(r.products || [])] : (r.products || [])));
+      setMatchCount(Number(r.count ?? 0));
+      if (r.categories) setCatalogCats(r.categories);
+      if (typeof r.allCount === "number") setAllCount(r.allCount);
+    } catch {
+      toast.error("Бараа ачаалж чадсангүй");
+    } finally {
+      opts.more ? setLoadingMore(false) : setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSummary(); }, []);
+
+  // Re-query whenever the cashier changes what they are looking for. Typing is
+  // debounced so a search does not fire a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { loadProducts(); }, q ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, cat, filter]);
   useEffect(() => { searchRef.current?.focus(); }, []);
 
   // Watch the QPay invoice; the sale is recorded the moment it reports paid.
@@ -142,53 +176,20 @@ const OfflineSalePage = () => {
     return () => { stop = true; clearInterval(timer); };
   }, [qpay, qpayStatus]);
 
-  // The store's real categories, straight off the catalogue — so one added in
-  // the admin appears at the till on the next load. Counted within the active
-  // audience so the numbers on screen match what a tap actually shows.
+  // The store's real categories, counted by the backend — so a category added
+  // in the admin appears at the till on the next load, and the counts stay
+  // right whether the shop carries 75 products or 50,000.
   const cats = useMemo(() => {
-    const active = FILTERS.find(f => f.key === filter) || FILTERS[0];
-    const pool = products.filter(active.match);
-    const byHandle = new Map<string, { handle: string; name: string; n: number }>();
-    for (const p of pool) {
-      for (const c of p.categories || []) {
-        if (!c?.handle) continue;
-        const row = byHandle.get(c.handle) || { handle: c.handle, name: c.name || c.handle, n: 0 };
-        row.n++;
-        byHandle.set(c.handle, row);
-      }
-    }
-    const list = [...byHandle.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
-    // Keep the selected category visible even when the audience filter empties
-    // it, otherwise the chip you are standing on disappears from under you.
-    if (cat && !list.some(c => c.handle === cat)) {
-      const known = products.flatMap(p => p.categories || []).find(c => c.handle === cat);
-      if (known) list.push({ handle: cat, name: known.name || cat, n: 0 });
-    }
-    return [{ handle: "", name: "Бүгд", n: pool.length }, ...list];
-  }, [products, filter, cat]);
+    const list = catalogCats || [];
+    const rows = list.map(c => ({ handle: c.handle, name: c.name, n: c.count }));
+    // Keep the selected category visible even if it is not in the list yet.
+    if (cat && !rows.some(c => c.handle === cat)) rows.push({ handle: cat, name: cat, n: 0 });
+    return [{ handle: "", name: "Бүгд", n: allCount }, ...rows];
+  }, [catalogCats, cat, allCount]);
 
-  // Audience counts, measured inside the chosen category for the same reason.
-  const counts = useMemo(() => {
-    const pool = products.filter(p => inCategory(p, cat));
-    const out: Record<string, number> = {};
-    for (const f of FILTERS) out[f.key] = pool.filter(f.match).length;
-    return out;
-  }, [products, cat]);
-
-  const visible = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const active = FILTERS.find(f => f.key === filter) || FILTERS[0];
-    return products.filter(p => {
-      if (!active.match(p)) return false;
-      if (!inCategory(p, cat)) return false;
-      if (!needle) return true;
-      return (
-        p.title.toLowerCase().includes(needle) ||
-        (p.brand || "").toLowerCase().includes(needle) ||
-        p.variants.some(v => (v.sku || "").toLowerCase().includes(needle))
-      );
-    });
-  }, [products, q, filter, cat]);
+  // The grid is exactly what the server returned: it has already applied the
+  // search, the category and the audience chip.
+  const visible = products;
 
   if (!permLoading && !can("orders.write")) {
     return <AccessDenied title="Кассын систем (POS)" perm="orders.write" />;
@@ -220,12 +221,31 @@ const OfflineSalePage = () => {
     setLines(prev => prev.flatMap(l => l.variant_id !== variantId ? [l] : l.quantity <= 1 ? [] : [{ ...l, quantity: l.quantity - 1 }]));
   const removeLine = (id: string) => setLines(prev => prev.filter(l => l.variant_id !== id));
 
-  const addTopResult = () => {
-    for (const p of visible) {
+  // Enter adds the best match for what is in the box.
+  //
+  // A barcode scanner types the whole code and sends Enter within
+  // milliseconds — before the debounced search has run — so this resolves the
+  // query itself instead of trusting whatever the grid happens to be showing.
+  // Adding the previous search's product to a ticket would be a money bug.
+  // The lookup ignores the category and audience chips: a scanned code should
+  // find its product whatever the cashier was browsing.
+  const addTopResult = async () => {
+    const needle = q.trim();
+    if (!needle) return;
+    let pool = visible;
+    try {
+      const r = await adminFetch(`/offline-sale?q=${encodeURIComponent(needle)}&limit=10`);
+      pool = r.products || [];
+    } catch { /* offline for a moment — fall back to what is on screen */ }
+    for (const p of pool) {
       const v = p.variants.find(x => !isOut(x));
-      if (v) { addVariant(p, v); return; }
+      if (v) {
+        addVariant(p, v);
+        setQ(""); // ready for the next scan
+        return;
+      }
     }
-    if (q.trim()) toast.error("Нэмэх боломжтой бараа олдсонгүй.");
+    toast.error("Нэмэх боломжтой бараа олдсонгүй.");
   };
 
   const subtotal = lines.reduce((a, l) => a + l.unit_price * l.quantity, 0);
@@ -369,9 +389,11 @@ const OfflineSalePage = () => {
           {/* Row 2 — audience, exactly the storefront's nav filters. */}
           <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-5 pb-3">
             {FILTERS.map(f => (
-              <Pill key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} label={f.label} n={counts[f.key] ?? 0} />
+              <Pill key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)} label={f.label} />
             ))}
-            <span className="ml-auto shrink-0 pl-3 text-[12px] tabular-nums text-ui-fg-muted">{visible.length} бараа</span>
+            <span className="ml-auto shrink-0 pl-3 text-[12px] tabular-nums text-ui-fg-muted">
+              {loading ? "…" : `${matchCount.toLocaleString("mn-MN")} бараа`}
+            </span>
           </div>
 
           {/* Product grid */}
@@ -455,6 +477,18 @@ const OfflineSalePage = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* The grid holds one page; the rest is a tap away. A cashier
+                normally searches instead of scrolling, so this stays quiet. */}
+            {!loading && visible.length > 0 && visible.length < matchCount && (
+              <div className="mt-5 grid place-items-center">
+                <button type="button" onClick={() => loadProducts({ more: true })} disabled={loadingMore}
+                  className="rounded-xl border bg-white px-5 py-2.5 text-[13px] font-medium transition hover:bg-ui-bg-subtle disabled:opacity-50"
+                  style={{ borderColor: "rgba(0,0,0,.1)" }}>
+                  {loadingMore ? "Ачаалж байна…" : `Цааш нь (${(matchCount - visible.length).toLocaleString("mn-MN")} бараа)`}
+                </button>
               </div>
             )}
           </div>
@@ -719,7 +753,7 @@ function CatCard({ name, n, active, onClick }: { name: string; n: number; active
 
 // Secondary filter chip — quieter than CatCard so the two rows read as a
 // hierarchy (category first, then audience) rather than competing.
-function Pill({ label, n, active, onClick }: { label: string; n: number; active: boolean; onClick: () => void }) {
+function Pill({ label, n, active, onClick }: { label: string; n?: number; active: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
       className="shrink-0 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition"
@@ -727,7 +761,7 @@ function Pill({ label, n, active, onClick }: { label: string; n: number; active:
         ? { background: BRAND.soft, borderColor: BRAND.accent, color: BRAND.deep }
         : { background: "#fff", borderColor: "rgba(0,0,0,.07)", color: "inherit" }}>
       {label}
-      <span className="ml-1.5 tabular-nums" style={{ opacity: .55 }}>{n}</span>
+      {n !== undefined && <span className="ml-1.5 tabular-nums" style={{ opacity: .55 }}>{n}</span>}
     </button>
   );
 }
